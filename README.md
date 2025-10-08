@@ -204,6 +204,306 @@ Generate and view documentation:
 zig build-lib src/root.zig -femit-docs
 ```
 
+## 📖 Primitives API Reference
+
+Zigeth provides a complete set of Ethereum primitives for building applications.
+
+### Address (20 bytes)
+
+Represents an Ethereum address.
+
+```zig
+const zigeth = @import("zigeth");
+const Address = zigeth.primitives.Address;
+
+// Create from bytes
+const addr = Address.fromBytes([_]u8{0} ** 20);
+
+// Create from hex string
+const addr2 = try Address.fromHex("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb");
+
+// Convert to hex
+const hex_str = try addr.toHex(allocator);
+defer allocator.free(hex_str);
+
+// Check if zero address
+if (addr.isZero()) {
+    // ...
+}
+```
+
+### Hash (32 bytes)
+
+Represents a Keccak-256 hash.
+
+```zig
+const Hash = zigeth.primitives.Hash;
+
+// Create from bytes
+const hash = Hash.fromBytes([_]u8{0xab} ** 32);
+
+// Create from hex string
+const hash2 = try Hash.fromHex("0x1234...cdef");
+
+// Create from slice
+const hash3 = try Hash.fromSlice(some_bytes);
+
+// Convert to hex
+const hex_str = try hash.toHex(allocator);
+defer allocator.free(hex_str);
+
+// Check if zero hash
+if (hash.isZero()) {
+    // ...
+}
+
+// Compare hashes
+if (hash1.eql(hash2)) {
+    // ...
+}
+
+// Print hash
+std.debug.print("Hash: {}\n", .{hash});
+```
+
+### Bytes (Dynamic)
+
+Dynamic byte array for Ethereum data.
+
+```zig
+const Bytes = zigeth.primitives.Bytes;
+
+// Create from slice (copies data)
+const bytes = try Bytes.fromSlice(allocator, &[_]u8{1, 2, 3, 4});
+defer bytes.deinit();
+
+// Create from hex
+const bytes2 = try Bytes.fromHex(allocator, "0xdeadbeef");
+defer bytes2.deinit();
+
+// Create empty
+const empty = Bytes.empty(allocator);
+defer empty.deinit();
+
+// Create with capacity
+const sized = try Bytes.withCapacity(allocator, 100);
+defer sized.deinit();
+
+// Convert to hex
+const hex_str = try bytes.toHex();
+defer allocator.free(hex_str);
+
+// Get length
+const len = bytes.len();
+
+// Check if empty
+if (bytes.isEmpty()) {
+    // ...
+}
+
+// Clone
+const copy = try bytes.clone();
+defer copy.deinit();
+
+// Compare
+if (bytes1.eql(bytes2)) {
+    // ...
+}
+```
+
+### Signature (65 bytes: r + s + v)
+
+ECDSA signature with EIP-155 support.
+
+```zig
+const Signature = zigeth.primitives.Signature;
+
+// Create from components
+const sig = Signature.init(r_bytes, s_bytes, v_byte);
+
+// Create from bytes (65 bytes)
+const sig2 = try Signature.fromBytes(signature_bytes);
+
+// Create from hex
+const sig3 = try Signature.fromHex(allocator, "0x1234...5678");
+
+// Convert to bytes
+const bytes = try sig.toBytes(allocator);
+defer allocator.free(bytes);
+
+// Convert to hex
+const hex_str = try sig.toHex(allocator);
+defer allocator.free(hex_str);
+
+// Get recovery ID (0 or 1)
+const recovery_id = sig.getRecoveryId();
+
+// Extract chain ID (for EIP-155 signatures)
+if (sig.getChainId()) |chain_id| {
+    std.debug.print("Chain ID: {}\n", .{chain_id});
+}
+
+// Create EIP-155 v value
+const v = Signature.eip155V(chain_id, recovery_id);
+
+// Validate signature
+if (sig.isValid()) {
+    // ...
+}
+
+// Compare signatures
+if (sig1.eql(sig2)) {
+    // ...
+}
+```
+
+### U256 (256-bit unsigned integer)
+
+Large unsigned integer for balances, gas, etc.
+
+```zig
+const U256 = zigeth.primitives.U256;
+
+// Create from u64
+const value = U256.fromInt(1000000000000000000); // 1 ETH in wei
+
+// Create zero/one
+const zero = U256.zero();
+const one = U256.one();
+const max = U256.max();
+
+// Create from bytes (big-endian, 32 bytes)
+const val = U256.fromBytes(bytes);
+
+// Create from hex
+const val2 = try U256.fromHex("0x2a");
+
+// Convert to bytes (big-endian)
+const bytes = val.toBytes();
+
+// Convert to hex
+const hex_str = try val.toHex(allocator);
+defer allocator.free(hex_str);
+
+// Check if zero
+if (val.isZero()) {
+    // ...
+}
+
+// Arithmetic operations
+const sum = a.add(b);
+const diff = a.sub(b);
+const product = a.mulScalar(10);
+const result = a.divScalar(3);
+// result.quotient and result.remainder
+
+// Comparisons
+if (a.lt(b)) { } // less than
+if (a.lte(b)) { } // less than or equal
+if (a.gt(b)) { } // greater than
+if (a.gte(b)) { } // greater than or equal
+if (a.eql(b)) { } // equal
+
+// Convert to u64
+const num = val.toU64(); // truncates
+const num2 = try val.tryToU64(); // errors if too large
+
+// Print value
+std.debug.print("Value: {}\n", .{val});
+```
+
+### Bloom (256 bytes / 2048 bits)
+
+Ethereum bloom filter for efficient log filtering.
+
+```zig
+const Bloom = zigeth.primitives.Bloom;
+
+// Create empty bloom
+var bloom = Bloom.empty();
+
+// Create from bytes
+const bloom2 = Bloom.fromBytes(bytes);
+
+// Create from hex
+const bloom3 = try Bloom.fromHex(hex_str);
+
+// Add a hash to the bloom
+bloom.add(&hash_bytes);
+
+// Check if bloom might contain a hash
+if (bloom.contains(&hash_bytes)) {
+    // Possibly present (may have false positives)
+}
+
+// Combine two blooms (OR operation)
+const combined = bloom1.combine(bloom2);
+
+// Check if one bloom contains another
+if (bloom1.containsBloom(bloom2)) {
+    // bloom1 has all bits set in bloom2
+}
+
+// Count bits set
+const bit_count = bloom.popCount();
+
+// Check if empty
+if (bloom.isEmpty()) {
+    // ...
+}
+
+// Compare blooms
+if (bloom1.eql(bloom2)) {
+    // ...
+}
+
+// Convert to hex
+const hex_str = try bloom.toHex(allocator);
+defer allocator.free(hex_str);
+```
+
+### Common Patterns
+
+#### Error Handling
+
+All functions that can fail return error unions:
+
+```zig
+const addr = try Address.fromHex(hex_str); // propagates error
+const hash = Hash.fromHex(hex_str) catch |err| {
+    std.debug.print("Error: {}\n", .{err});
+    return err;
+};
+```
+
+#### Memory Management
+
+Functions that allocate memory require an allocator:
+
+```zig
+const hex_str = try addr.toHex(allocator);
+defer allocator.free(hex_str); // Always free allocated memory
+```
+
+#### Conversions
+
+Most types support hex and byte conversions:
+
+```zig
+// To hex (allocates)
+const hex = try value.toHex(allocator);
+defer allocator.free(hex);
+
+// From hex
+const value = try Type.fromHex(hex_str);
+
+// To bytes (stack allocated for fixed sizes)
+const bytes = value.toBytes();
+
+// From bytes
+const value = Type.fromBytes(bytes);
+```
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
