@@ -1,46 +1,96 @@
-//! By convention, main.zig is where your main function lives in the case that
-//! you are building an executable. If you are making a library, the convention
-//! is to delete this file and start with root.zig instead.
+//! Zigeth CLI - Command line interface for Ethereum interactions
+const std = @import("std");
+const zigeth = @import("zigeth");
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+    const stdout = std.io.getStdOut().writer();
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    // Parse command line arguments
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
 
-    try bw.flush(); // Don't forget to flush!
+    if (args.len < 2) {
+        try printUsage(stdout);
+        return;
+    }
+
+    const command = args[1];
+
+    if (std.mem.eql(u8, command, "version")) {
+        try stdout.print("zigeth v0.1.0\n", .{});
+    } else if (std.mem.eql(u8, command, "help")) {
+        try printUsage(stdout);
+    } else if (std.mem.eql(u8, command, "address")) {
+        try handleAddressCommand(allocator, stdout, args[2..]);
+    } else {
+        try stdout.print("Unknown command: {s}\n\n", .{command});
+        try printUsage(stdout);
+    }
 }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // Try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+fn printUsage(writer: anytype) !void {
+    try writer.print(
+        \\Zigeth - Ethereum library and CLI tool
+        \\
+        \\Usage: zigeth <command> [options]
+        \\
+        \\Commands:
+        \\  version              Show version information
+        \\  help                 Show this help message
+        \\  address <command>    Address utilities
+        \\
+        \\Address commands:
+        \\  create               Create a new random address
+        \\  checksum <address>   Convert address to checksummed format
+        \\
+        \\Examples:
+        \\  zigeth version
+        \\  zigeth address create
+        \\
+    , .{});
 }
 
-test "use other module" {
-    try std.testing.expectEqual(@as(i32, 150), lib.add(100, 50));
-}
+fn handleAddressCommand(allocator: std.mem.Allocator, writer: anytype, args: []const [:0]const u8) !void {
+    if (args.len == 0) {
+        try writer.print("Error: address command requires a subcommand\n", .{});
+        return;
+    }
 
-test "fuzz example" {
-    const Context = struct {
-        fn testOne(context: @This(), input: []const u8) anyerror!void {
-            _ = context;
-            // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-            try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
+    const subcommand = args[0];
+
+    if (std.mem.eql(u8, subcommand, "create")) {
+        // Create a zero address for demonstration
+        const addr = zigeth.primitives.Address.fromBytes([_]u8{0} ** 20);
+        const hex_str = try addr.toHex(allocator);
+        defer allocator.free(hex_str);
+        try writer.print("Address: {s}\n", .{hex_str});
+    } else if (std.mem.eql(u8, subcommand, "checksum")) {
+        if (args.len < 2) {
+            try writer.print("Error: checksum requires an address argument\n", .{});
+            return;
         }
-    };
-    try std.testing.fuzz(Context{}, Context.testOne, .{});
+        // This is a placeholder - checksum implementation would go here
+        try writer.print("Checksum not yet implemented\n", .{});
+    } else {
+        try writer.print("Unknown address subcommand: {s}\n", .{subcommand});
+    }
 }
 
-const std = @import("std");
+test "address creation" {
+    const addr = zigeth.primitives.Address.fromBytes([_]u8{0} ** 20);
+    try std.testing.expect(addr.isZero());
+}
 
-/// This imports the separate module containing `root.zig`. Take a look in `build.zig` for details.
-const lib = @import("zigeth_lib");
+test "address hex conversion" {
+    const allocator = std.testing.allocator;
+
+    const addr = zigeth.primitives.Address.fromBytes([_]u8{ 0xde, 0xad, 0xbe, 0xef } ++ [_]u8{0} ** 16);
+    const hex_str = try addr.toHex(allocator);
+    defer allocator.free(hex_str);
+
+    try std.testing.expect(std.mem.startsWith(u8, hex_str, "0xdeadbeef"));
+}
