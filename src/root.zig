@@ -16,8 +16,16 @@ pub const primitives = struct {
 };
 pub const types = struct {
     pub const Transaction = @import("types/transaction.zig").Transaction;
+    pub const TransactionType = @import("types/transaction.zig").TransactionType;
     pub const Block = @import("types/block.zig").Block;
+    pub const BlockHeader = @import("types/block.zig").BlockHeader;
     pub const Receipt = @import("types/receipt.zig").Receipt;
+    pub const TransactionStatus = @import("types/receipt.zig").TransactionStatus;
+    pub const Log = @import("types/log.zig").Log;
+    pub const AccessList = @import("types/access_list.zig").AccessList;
+    pub const AccessListEntry = @import("types/access_list.zig").AccessList.AccessListEntry;
+    pub const Authorization = @import("types/transaction.zig").Authorization;
+    pub const AuthorizationList = @import("types/transaction.zig").AuthorizationList;
 };
 
 pub const crypto = struct {
