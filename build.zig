@@ -31,18 +31,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Link system libraries for networking and crypto
+    // Link libc (required for some std library functions)
     lib.linkLibC();
-
-    // Platform-specific linking
-    if (target.result.os.tag == .linux) {
-        lib.linkSystemLibrary("ssl");
-        lib.linkSystemLibrary("crypto");
-    } else if (target.result.os.tag == .macos) {
-        // macOS has built-in crypto frameworks
-        lib.linkFramework("Security");
-        lib.linkFramework("CoreFoundation");
-    }
 
     b.installArtifact(lib);
 
@@ -56,15 +46,6 @@ pub fn build(b: *std.Build) void {
 
     exe.root_module.addImport("zigeth", zigeth_mod);
     exe.linkLibC();
-
-    // Platform-specific linking for executable
-    if (target.result.os.tag == .linux) {
-        exe.linkSystemLibrary("ssl");
-        exe.linkSystemLibrary("crypto");
-    } else if (target.result.os.tag == .macos) {
-        exe.linkFramework("Security");
-        exe.linkFramework("CoreFoundation");
-    }
 
     b.installArtifact(exe);
 
@@ -86,13 +67,6 @@ pub fn build(b: *std.Build) void {
     });
 
     lib_unit_tests.linkLibC();
-    if (target.result.os.tag == .linux) {
-        lib_unit_tests.linkSystemLibrary("ssl");
-        lib_unit_tests.linkSystemLibrary("crypto");
-    } else if (target.result.os.tag == .macos) {
-        lib_unit_tests.linkFramework("Security");
-        lib_unit_tests.linkFramework("CoreFoundation");
-    }
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
@@ -166,14 +140,6 @@ pub fn build(b: *std.Build) void {
             example_exe.root_module.addImport("zigeth", zigeth_mod);
             example_exe.linkLibC();
 
-            if (target.result.os.tag == .linux) {
-                example_exe.linkSystemLibrary("ssl");
-                example_exe.linkSystemLibrary("crypto");
-            } else if (target.result.os.tag == .macos) {
-                example_exe.linkFramework("Security");
-                example_exe.linkFramework("CoreFoundation");
-            }
-
             const install_example = b.addInstallArtifact(example_exe, .{
                 .dest_dir = .{
                     .override = .{
@@ -224,13 +190,6 @@ pub fn build(b: *std.Build) void {
         .optimize = .Debug,
     });
     lint_lib.linkLibC();
-    if (target.result.os.tag == .linux) {
-        lint_lib.linkSystemLibrary("ssl");
-        lint_lib.linkSystemLibrary("crypto");
-    } else if (target.result.os.tag == .macos) {
-        lint_lib.linkFramework("Security");
-        lint_lib.linkFramework("CoreFoundation");
-    }
 
     const lint_lib_check = b.addInstallArtifact(lint_lib, .{
         .dest_dir = .{ .override = .{ .custom = "lint" } },
@@ -246,13 +205,6 @@ pub fn build(b: *std.Build) void {
     });
     lint_exe.root_module.addImport("zigeth", zigeth_mod);
     lint_exe.linkLibC();
-    if (target.result.os.tag == .linux) {
-        lint_exe.linkSystemLibrary("ssl");
-        lint_exe.linkSystemLibrary("crypto");
-    } else if (target.result.os.tag == .macos) {
-        lint_exe.linkFramework("Security");
-        lint_exe.linkFramework("CoreFoundation");
-    }
 
     const lint_exe_check = b.addInstallArtifact(lint_exe, .{
         .dest_dir = .{ .override = .{ .custom = "lint" } },
