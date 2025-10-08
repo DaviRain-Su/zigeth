@@ -6,7 +6,14 @@
 const std = @import("std");
 
 // Re-export main modules
-pub const primitives = @import("primitives/address.zig");
+pub const primitives = struct {
+    pub const Address = @import("primitives/address.zig").Address;
+    pub const Hash = @import("primitives/hash.zig").Hash;
+    pub const Bytes = @import("primitives/bytes.zig").Bytes;
+    pub const Signature = @import("primitives/signature.zig").Signature;
+    pub const U256 = @import("primitives/uint.zig").U256;
+    pub const Bloom = @import("primitives/bloom.zig").Bloom;
+};
 pub const types = struct {
     pub const Transaction = @import("types/transaction.zig").Transaction;
     pub const Block = @import("types/block.zig").Block;
@@ -36,7 +43,13 @@ pub const providers = struct {
 pub const rpc = @import("rpc/client.zig");
 pub const contract = @import("contract/contract.zig");
 pub const signer = @import("signer/wallet.zig");
-pub const utils = @import("utils/hex.zig");
+
+pub const utils = struct {
+    pub const hex = @import("utils/hex.zig");
+    pub const format = @import("utils/format.zig");
+    pub const units = @import("utils/units.zig");
+    pub const checksum = @import("utils/checksum.zig");
+};
 
 test {
     std.testing.refAllDecls(@This());
