@@ -33,7 +33,7 @@ pub fn build(b: *std.Build) void {
 
     // Link system libraries for networking and crypto
     lib.linkLibC();
-    
+
     // Platform-specific linking
     if (target.result.os.tag == .linux) {
         lib.linkSystemLibrary("ssl");
@@ -125,7 +125,7 @@ pub fn build(b: *std.Build) void {
     // Benchmarks (if enabled)
     if (enable_benchmarks) {
         const bench_step = b.step("bench", "Run benchmarks");
-        
+
         // Example benchmark structure
         // const bench_exe = b.addExecutable(.{
         //     .name = "bench",
@@ -136,14 +136,14 @@ pub fn build(b: *std.Build) void {
         // bench_exe.root_module.addImport("zigeth", zigeth_mod);
         // const run_bench = b.addRunArtifact(bench_exe);
         // bench_step.dependOn(&run_bench.step);
-        
+
         _ = bench_step;
     }
 
     // Examples (if enabled)
     if (enable_examples) {
         const examples_step = b.step("examples", "Build all examples");
-        
+
         // Add example executables here
         const example_names = [_][]const u8{
             "basic_usage",
@@ -155,7 +155,7 @@ pub fn build(b: *std.Build) void {
 
         for (example_names) |example_name| {
             const example_path = b.fmt("examples/{s}.zig", .{example_name});
-            
+
             const example_exe = b.addExecutable(.{
                 .name = example_name,
                 .root_source_file = b.path(example_path),
@@ -212,10 +212,10 @@ pub fn build(b: *std.Build) void {
 
     // Lint step (comprehensive code quality checks)
     const lint_step = b.step("lint", "Run all linting and code quality checks");
-    
+
     // 1. Format checking
     lint_step.dependOn(&fmt_check.step);
-    
+
     // 2. Build library with warnings
     const lint_lib = b.addStaticLibrary(.{
         .name = "zigeth-lint",
@@ -231,12 +231,12 @@ pub fn build(b: *std.Build) void {
         lint_lib.linkFramework("Security");
         lint_lib.linkFramework("CoreFoundation");
     }
-    
+
     const lint_lib_check = b.addInstallArtifact(lint_lib, .{
         .dest_dir = .{ .override = .{ .custom = "lint" } },
     });
     lint_step.dependOn(&lint_lib_check.step);
-    
+
     // 3. Build executable with warnings
     const lint_exe = b.addExecutable(.{
         .name = "zigeth-lint",
@@ -253,12 +253,12 @@ pub fn build(b: *std.Build) void {
         lint_exe.linkFramework("Security");
         lint_exe.linkFramework("CoreFoundation");
     }
-    
+
     const lint_exe_check = b.addInstallArtifact(lint_exe, .{
         .dest_dir = .{ .override = .{ .custom = "lint" } },
     });
     lint_step.dependOn(&lint_exe_check.step);
-    
+
     // 4. Run all tests as part of lint
     lint_step.dependOn(&run_lib_unit_tests.step);
     lint_step.dependOn(&run_exe_unit_tests.step);

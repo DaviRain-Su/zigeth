@@ -177,9 +177,24 @@ Run tests:
 zig build test
 ```
 
+Run linting and code quality checks:
+```bash
+zig build lint
+```
+
+Format code:
+```bash
+zig build fmt
+```
+
 Run the executable:
 ```bash
 zig build run
+```
+
+Clean build artifacts:
+```bash
+zig build clean
 ```
 
 ## 📚 Documentation
