@@ -31,6 +31,15 @@ pub const types = struct {
 pub const crypto = struct {
     pub const keccak = @import("crypto/keccak.zig");
     pub const secp256k1 = @import("crypto/secp256k1.zig");
+    pub const ecdsa = @import("crypto/ecdsa.zig");
+    pub const utils = @import("crypto/utils.zig");
+
+    // Re-export commonly used types
+    pub const Keccak256 = keccak.Keccak256;
+    pub const PrivateKey = secp256k1.PrivateKey;
+    pub const PublicKey = secp256k1.PublicKey;
+    pub const Signer = ecdsa.Signer;
+    pub const TransactionSigner = ecdsa.TransactionSigner;
 };
 
 pub const abi = struct {

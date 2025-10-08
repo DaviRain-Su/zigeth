@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+  build-release:
+    name: Build Release (${{ matrix.os }}, ${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-linux
+            artifact: zigeth-linux-x86_64.tar.gz
+          
+          - os: ubuntu-latest
+            target: aarch64-linux
+            artifact: zigeth-linux-aarch64.tar.gz
+          
+          - os: macos-latest
+            target: x86_64-macos
+            artifact: zigeth-macos-x86_64.tar.gz
+          
+          - os: macos-latest
+            target: aarch64-macos
+            artifact: zigeth-macos-aarch64.tar.gz
+          
+          - os: windows-latest
+            target: x86_64-windows
+            artifact: zigeth-windows-x86_64.zip
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Build Release
+        run: zig build -Doptimize=ReleaseFast
+
+      - name: Create Archive (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd zig-out
+          tar czf ../${{ matrix.artifact }} *
+
+      - name: Create Archive (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd zig-out
+          7z a ../${{ matrix.artifact }} *
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.artifact }}
+          asset_name: ${{ matrix.artifact }}
+          asset_content_type: application/octet-stream
+

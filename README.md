@@ -1,5 +1,9 @@
 # Zigeth
 
+[![CI](https://github.com/yourusername/zigeth/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/zigeth/actions/workflows/ci.yml)
+[![Zig](https://img.shields.io/badge/Zig-0.14.1-orange.svg)](https://ziglang.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A comprehensive Ethereum library for Zig, providing primitives, RPC client, ABI/RLP encoding/decoding, contract interaction, and wallet management for seamless integration with Ethereum networks.
 
 ## 🏗️ Architecture
