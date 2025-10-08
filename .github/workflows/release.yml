@@ -7,27 +7,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-
   build-release:
     name: Build Release (${{ matrix.os }}, ${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -72,17 +54,41 @@ jobs:
 
       - name: Create Archive (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           cd zig-out
-          7z a ../${{ matrix.artifact }} *
+          Compress-Archive -Path * -DestinationPath ../${{ matrix.artifact }}
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build-release
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./${{ matrix.artifact }}
-          asset_name: ${{ matrix.artifact }}
-          asset_content_type: application/octet-stream
-
