@@ -11,7 +11,22 @@ pub const primitives = struct {
     pub const Hash = @import("primitives/hash.zig").Hash;
     pub const Bytes = @import("primitives/bytes.zig").Bytes;
     pub const Signature = @import("primitives/signature.zig").Signature;
+
+    /// Legacy U256 wrapper - DEPRECATED: Use native `u256` type instead
+    /// For Ethereum-specific conversions, use the utility functions:
+    /// - u256FromBytes() - Convert from big-endian bytes
+    /// - u256ToBytes() - Convert to big-endian bytes
+    /// - u256FromHex() - Parse from hex string
+    /// - u256ToHex() - Format as hex string
     pub const U256 = @import("primitives/uint.zig").U256;
+
+    // u256 Ethereum utility functions
+    pub const u256FromBytes = @import("primitives/uint.zig").u256FromBytes;
+    pub const u256ToBytes = @import("primitives/uint.zig").u256ToBytes;
+    pub const u256FromHex = @import("primitives/uint.zig").u256FromHex;
+    pub const u256ToHex = @import("primitives/uint.zig").u256ToHex;
+    pub const u256ToU64 = @import("primitives/uint.zig").u256ToU64;
+
     pub const Bloom = @import("primitives/bloom.zig").Bloom;
 };
 pub const types = struct {

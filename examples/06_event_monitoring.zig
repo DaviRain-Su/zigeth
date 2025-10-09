@@ -5,7 +5,6 @@
 /// - Filter and parse event logs
 /// - Track specific contract events
 /// - Use real-time subscriptions
-
 const std = @import("std");
 const zigeth = @import("zigeth");
 
@@ -75,10 +74,7 @@ pub fn main() !void {
     std.debug.print("───────────────────────────────────────\n", .{});
     {
         // USDC contract - simple string literal!
-        const usdc_address = try zigeth.primitives.Address.fromHex(
-            
-            "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-        );
+        const usdc_address = try zigeth.primitives.Address.fromHex("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
 
         const addr_hex = try usdc_address.toHex(allocator);
         defer allocator.free(addr_hex);
@@ -183,4 +179,3 @@ pub fn main() !void {
     std.debug.print("🎉 All event monitoring examples completed!\n", .{});
     std.debug.print("💡 Tip: Use WebSocket for real-time, HTTP for historical data\n\n", .{});
 }
-

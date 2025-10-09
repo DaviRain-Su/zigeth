@@ -3,7 +3,8 @@ const encode = @import("./encode.zig");
 const decode = @import("./decode.zig");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
+const U256 = @import("../primitives/uint.zig").U256; // Legacy compatibility
+const uint_utils = @import("../primitives/uint.zig");
 const Signature = @import("../primitives/signature.zig").Signature;
 const Transaction = @import("../types/transaction.zig").Transaction;
 const TransactionType = @import("../types/transaction.zig").TransactionType;
@@ -26,7 +27,7 @@ pub const TransactionEncoder = struct {
         try items.append(.{ .uint = tx.nonce });
 
         // gas_price
-        const gas_price_bytes = tx.gas_price.?.toBytes();
+        const gas_price_bytes = uint_utils.u256ToBytes(tx.gas_price.?);
         try items.append(.{ .bytes = &gas_price_bytes });
 
         // gas_limit
@@ -40,7 +41,7 @@ pub const TransactionEncoder = struct {
         }
 
         // value
-        const value_bytes = tx.value.toBytes();
+        const value_bytes = uint_utils.u256ToBytes(tx.value);
         try items.append(.{ .bytes = &value_bytes });
 
         // data
@@ -76,7 +77,7 @@ pub const TransactionEncoder = struct {
         try items.append(.{ .uint = tx.nonce });
 
         // gas_price
-        const gas_price_bytes = tx.gas_price.?.toBytes();
+        const gas_price_bytes = uint_utils.u256ToBytes(tx.gas_price.?);
         try items.append(.{ .bytes = &gas_price_bytes });
 
         // gas_limit
@@ -90,7 +91,7 @@ pub const TransactionEncoder = struct {
         }
 
         // value
-        const value_bytes = tx.value.toBytes();
+        const value_bytes = uint_utils.u256ToBytes(tx.value);
         try items.append(.{ .bytes = &value_bytes });
 
         // data
@@ -100,11 +101,9 @@ pub const TransactionEncoder = struct {
         const sig = tx.signature.?;
         try items.append(.{ .uint = sig.v });
 
-        const r_bytes = sig.r.toBytes();
-        try items.append(.{ .bytes = &r_bytes });
-
-        const s_bytes = sig.s.toBytes();
-        try items.append(.{ .bytes = &s_bytes });
+        // r and s are already [32]u8 arrays
+        try items.append(.{ .bytes = &sig.r });
+        try items.append(.{ .bytes = &sig.s });
 
         return try encode.encodeList(allocator, items.items);
     }

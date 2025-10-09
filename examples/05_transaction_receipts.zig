@@ -5,7 +5,6 @@
 /// - Parse transaction data
 /// - Calculate transaction fees
 /// - Filter logs from receipts
-
 const std = @import("std");
 const zigeth = @import("zigeth");
 
@@ -75,16 +74,16 @@ pub fn main() !void {
 
         // Simulated receipt data
         const gas_used: u64 = 21000;
-        const gas_price = zigeth.primitives.U256.fromInt(50_000_000_000); // 50 gwei
+        const gas_price: u256 = 50_000_000_000; // 50 gwei
 
-        const fee = gas_price.mulScalar(gas_used);
+        const fee = gas_price * gas_used;
 
         std.debug.print("   Gas used: {d}\n", .{gas_used});
         std.debug.print("   Gas price: 50 gwei\n", .{});
         std.debug.print("   Total fee: {} wei\n", .{fee});
 
-        // Convert to ETH
-        const fee_u64 = fee.toU64();
+        // Convert to ETH (simple cast since we know it's a small value)
+        const fee_u64: u64 = @intCast(fee); // Safe cast for this example
         const fee_eth = @as(f64, @floatFromInt(fee_u64)) / 1_000_000_000_000_000_000.0;
         std.debug.print("   Total fee: {d:.6} ETH\n\n", .{fee_eth});
     }
@@ -179,4 +178,3 @@ pub fn main() !void {
     std.debug.print("🎉 All receipt examples completed!\n", .{});
     std.debug.print("💡 Tip: Always check receipt.status before considering TX successful\n\n", .{});
 }
-

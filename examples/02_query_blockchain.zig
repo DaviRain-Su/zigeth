@@ -71,8 +71,8 @@ pub fn main() !void {
         std.debug.print("✅ Gas price: {} wei\n", .{gas_price});
 
         // Convert to gwei
-        const gas_u64 = gas_price.toU64();
-        const gwei = @as(f64, @floatFromInt(gas_u64)) / 1_000_000_000.0;
+        const gas_u64: u64 = @intCast(gas_price / 1_000_000_000);
+        const gwei = @as(f64, @floatFromInt(gas_u64));
         std.debug.print("   Gas price: {d:.2} gwei\n\n", .{gwei});
     }
 

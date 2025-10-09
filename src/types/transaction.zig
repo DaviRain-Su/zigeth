@@ -3,7 +3,6 @@ const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
 const Bytes = @import("../primitives/bytes.zig").Bytes;
 const Signature = @import("../primitives/signature.zig").Signature;
-const U256 = @import("../primitives/uint.zig").U256;
 const AccessList = @import("./access_list.zig").AccessList;
 
 /// Transaction type
@@ -31,8 +30,8 @@ pub const Authorization = struct {
     nonce: u64,
     /// Authorization signature (y_parity, r, s)
     y_parity: u8,
-    r: U256,
-    s: U256,
+    r: u256,
+    s: u256,
 };
 
 /// Authorization list for EIP-7702 transactions
@@ -93,16 +92,16 @@ pub const Transaction = struct {
     gas_limit: u64,
 
     /// Gas price (legacy and EIP-2930)
-    gas_price: ?U256,
+    gas_price: ?u256,
 
     /// Max fee per gas (EIP-1559)
-    max_fee_per_gas: ?U256,
+    max_fee_per_gas: ?u256,
 
     /// Max priority fee per gas (EIP-1559)
-    max_priority_fee_per_gas: ?U256,
+    max_priority_fee_per_gas: ?u256,
 
     /// Value to transfer (in wei)
-    value: U256,
+    value: u256,
 
     /// Transaction data / input
     data: Bytes,
@@ -137,11 +136,11 @@ pub const Transaction = struct {
     pub fn newLegacy(
         allocator: std.mem.Allocator,
         to: ?Address,
-        value: U256,
+        value: u256,
         data: Bytes,
         nonce: u64,
         gas_limit: u64,
-        gas_price: U256,
+        gas_price: u256,
     ) Transaction {
         return .{
             .type = .legacy,
@@ -170,12 +169,12 @@ pub const Transaction = struct {
     pub fn newEip1559(
         allocator: std.mem.Allocator,
         to: ?Address,
-        value: U256,
+        value: u256,
         data: Bytes,
         nonce: u64,
         gas_limit: u64,
-        max_fee_per_gas: U256,
-        max_priority_fee_per_gas: U256,
+        max_fee_per_gas: u256,
+        max_priority_fee_per_gas: u256,
         chain_id: u64,
         access_list: ?AccessList,
     ) Transaction {
@@ -206,11 +205,11 @@ pub const Transaction = struct {
     pub fn newEip2930(
         allocator: std.mem.Allocator,
         to: ?Address,
-        value: U256,
+        value: u256,
         data: Bytes,
         nonce: u64,
         gas_limit: u64,
-        gas_price: U256,
+        gas_price: u256,
         chain_id: u64,
         access_list: AccessList,
     ) Transaction {
@@ -241,12 +240,12 @@ pub const Transaction = struct {
     pub fn newEip7702(
         allocator: std.mem.Allocator,
         to: ?Address,
-        value: U256,
+        value: u256,
         data: Bytes,
         nonce: u64,
         gas_limit: u64,
-        max_fee_per_gas: U256,
-        max_priority_fee_per_gas: U256,
+        max_fee_per_gas: u256,
+        max_priority_fee_per_gas: u256,
         chain_id: u64,
         access_list: ?AccessList,
         authorization_list: AuthorizationList,
@@ -296,7 +295,7 @@ pub const Transaction = struct {
     }
 
     /// Get the effective gas price
-    pub fn getGasPrice(self: Transaction) ?U256 {
+    pub fn getGasPrice(self: Transaction) ?u256 {
         return switch (self.type) {
             .legacy, .eip2930 => self.gas_price,
             .eip1559, .eip4844, .eip7702 => self.max_fee_per_gas,
@@ -318,7 +317,7 @@ test "legacy transaction creation" {
     const allocator = std.testing.allocator;
 
     const to = Address.fromBytes([_]u8{0x12} ** 20);
-    const value = U256.fromInt(1000);
+    const value = @as(u256, 1000);
     const data = try Bytes.fromSlice(allocator, &[_]u8{ 1, 2, 3 });
 
     const tx = Transaction.newLegacy(
@@ -328,7 +327,7 @@ test "legacy transaction creation" {
         data,
         0, // nonce
         21000, // gas_limit
-        U256.fromInt(20000000000), // gas_price (20 gwei)
+        @as(u256, 20000000000), // gas_price (20 gwei)
     );
     defer tx.deinit();
 
@@ -341,7 +340,7 @@ test "eip1559 transaction creation" {
     const allocator = std.testing.allocator;
 
     const to = Address.fromBytes([_]u8{0x12} ** 20);
-    const value = U256.fromInt(1000);
+    const value = @as(u256, 1000);
     const data = try Bytes.fromSlice(allocator, &[_]u8{});
 
     const tx = Transaction.newEip1559(
@@ -351,8 +350,8 @@ test "eip1559 transaction creation" {
         data,
         5, // nonce
         21000, // gas_limit
-        U256.fromInt(30000000000), // max_fee_per_gas
-        U256.fromInt(2000000000), // max_priority_fee_per_gas
+        @as(u256, 30000000000), // max_fee_per_gas
+        @as(u256, 2000000000), // max_priority_fee_per_gas
         1, // chain_id (mainnet)
         null, // no access list
     );
@@ -371,11 +370,11 @@ test "contract creation transaction" {
     const tx = Transaction.newLegacy(
         allocator,
         null, // no recipient = contract creation
-        U256.zero(),
+        0,
         bytecode,
         0,
         100000,
-        U256.fromInt(20000000000),
+        @as(u256, 20000000000),
     );
     defer tx.deinit();
 
@@ -392,28 +391,28 @@ test "transaction gas price" {
     const legacy_tx = Transaction.newLegacy(
         allocator,
         to,
-        U256.zero(),
+        0,
         data,
         0,
         21000,
-        U256.fromInt(20000000000),
+        @as(u256, 20000000000),
     );
 
     const legacy_price = legacy_tx.getGasPrice();
     try std.testing.expect(legacy_price != null);
-    try std.testing.expect(legacy_price.?.eql(U256.fromInt(20000000000)));
+    try std.testing.expectEqual(@as(u256, 20000000000), legacy_price.?);
 
     // EIP-1559 transaction
     const data2 = try Bytes.fromSlice(allocator, &[_]u8{});
     const eip1559_tx = Transaction.newEip1559(
         allocator,
         to,
-        U256.zero(),
+        0,
         data2,
         0,
         21000,
-        U256.fromInt(30000000000),
-        U256.fromInt(2000000000),
+        @as(u256, 30000000000),
+        @as(u256, 2000000000),
         1,
         null,
     );
@@ -421,7 +420,7 @@ test "transaction gas price" {
 
     const eip1559_price = eip1559_tx.getGasPrice();
     try std.testing.expect(eip1559_price != null);
-    try std.testing.expect(eip1559_price.?.eql(U256.fromInt(30000000000)));
+    try std.testing.expectEqual(@as(u256, 30000000000), eip1559_price.?);
 }
 
 test "transaction pending status" {
@@ -433,11 +432,11 @@ test "transaction pending status" {
     var tx = Transaction.newLegacy(
         allocator,
         to,
-        U256.zero(),
+        0,
         data,
         0,
         21000,
-        U256.fromInt(20000000000),
+        @as(u256, 20000000000),
     );
     defer tx.deinit();
 
@@ -455,8 +454,8 @@ test "authorization list" {
         .address = Address.fromBytes([_]u8{0x12} ** 20),
         .nonce = 5,
         .y_parity = 0,
-        .r = U256.fromInt(12345),
-        .s = U256.fromInt(67890),
+        .r = @as(u256, 12345),
+        .s = @as(u256, 67890),
     };
 
     const auths = [_]Authorization{auth};
@@ -472,7 +471,7 @@ test "eip7702 transaction creation" {
     const allocator = std.testing.allocator;
 
     const to = Address.fromBytes([_]u8{0x12} ** 20);
-    const value = U256.fromInt(1000);
+    const value = @as(u256, 1000);
     const data = try Bytes.fromSlice(allocator, &[_]u8{ 1, 2, 3 });
 
     const auth = Authorization{
@@ -480,8 +479,8 @@ test "eip7702 transaction creation" {
         .address = Address.fromBytes([_]u8{0xAB} ** 20),
         .nonce = 0,
         .y_parity = 1,
-        .r = U256.fromInt(11111),
-        .s = U256.fromInt(22222),
+        .r = @as(u256, 11111),
+        .s = @as(u256, 22222),
     };
 
     const auths = [_]Authorization{auth};
@@ -494,8 +493,8 @@ test "eip7702 transaction creation" {
         data,
         5, // nonce
         21000, // gas_limit
-        U256.fromInt(30000000000), // max_fee_per_gas
-        U256.fromInt(2000000000), // max_priority_fee_per_gas
+        @as(u256, 30000000000), // max_fee_per_gas
+        @as(u256, 2000000000), // max_priority_fee_per_gas
         1, // chain_id (mainnet)
         null, // no access list
         auth_list,
@@ -519,12 +518,12 @@ test "eip7702 gas price" {
     const tx = Transaction.newEip7702(
         allocator,
         to,
-        U256.zero(),
+        0,
         data,
         0,
         21000,
-        U256.fromInt(30000000000), // max_fee_per_gas
-        U256.fromInt(2000000000), // max_priority_fee_per_gas
+        @as(u256, 30000000000), // max_fee_per_gas
+        @as(u256, 2000000000), // max_priority_fee_per_gas
         1,
         null,
         auth_list,
@@ -533,5 +532,5 @@ test "eip7702 gas price" {
 
     const gas_price = tx.getGasPrice();
     try std.testing.expect(gas_price != null);
-    try std.testing.expect(gas_price.?.eql(U256.fromInt(30000000000)));
+    try std.testing.expectEqual(@as(u256, 30000000000), gas_price.?);
 }

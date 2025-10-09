@@ -2,7 +2,6 @@ const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
 const Bloom = @import("../primitives/bloom.zig").Bloom;
-const U256 = @import("../primitives/uint.zig").U256;
 const Log = @import("./log.zig").Log;
 
 /// Transaction execution status
@@ -40,7 +39,7 @@ pub const Receipt = struct {
     gas_used: u64,
 
     /// Effective gas price paid
-    effective_gas_price: U256,
+    effective_gas_price: u256,
 
     /// Contract address created (if contract creation transaction)
     contract_address: ?Address,
@@ -73,7 +72,7 @@ pub const Receipt = struct {
         to: ?Address,
         cumulative_gas_used: u64,
         gas_used: u64,
-        effective_gas_price: U256,
+        effective_gas_price: u256,
         logs: []const Log,
         logs_bloom: Bloom,
         status: TransactionStatus,
@@ -133,8 +132,8 @@ pub const Receipt = struct {
     }
 
     /// Calculate transaction fee (gas_used * effective_gas_price)
-    pub fn calculateFee(self: Receipt) U256 {
-        return self.effective_gas_price.mulScalar(self.gas_used);
+    pub fn calculateFee(self: Receipt) u256 {
+        return self.effective_gas_price * self.gas_used;
     }
 
     /// Check if receipt contains logs from a specific address
@@ -180,7 +179,7 @@ test "receipt creation" {
         to,
         21000, // cumulative_gas_used
         21000, // gas_used
-        U256.fromInt(20000000000), // effective_gas_price
+        @as(u256, 20000000000), // effective_gas_price
         &[_]Log{}, // no logs
         Bloom.empty(),
         .success,
@@ -209,7 +208,7 @@ test "receipt transaction fee" {
         null,
         21000,
         21000,
-        U256.fromInt(20000000000), // 20 gwei
+        @as(u256, 20000000000), // 20 gwei
         &[_]Log{},
         Bloom.empty(),
         .success,
@@ -218,7 +217,7 @@ test "receipt transaction fee" {
 
     const fee = receipt.calculateFee();
     // 21000 * 20000000000 = 420000000000000
-    try std.testing.expect(fee.eql(U256.fromInt(420000000000000)));
+    try std.testing.expectEqual(@as(u256, 420000000000000), fee);
 }
 
 test "receipt success and failure" {
@@ -239,7 +238,7 @@ test "receipt success and failure" {
         null,
         21000,
         21000,
-        U256.fromInt(20000000000),
+        @as(u256, 20000000000),
         &[_]Log{},
         Bloom.empty(),
         .success,
@@ -260,7 +259,7 @@ test "receipt success and failure" {
         null,
         21000,
         21000,
-        U256.fromInt(20000000000),
+        @as(u256, 20000000000),
         &[_]Log{},
         Bloom.empty(),
         .failed,
@@ -289,7 +288,7 @@ test "receipt contract creation" {
         null, // no 'to' for contract creation
         100000,
         100000,
-        U256.fromInt(20000000000),
+        @as(u256, 20000000000),
         &[_]Log{},
         Bloom.empty(),
         .success,

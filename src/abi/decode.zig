@@ -1,7 +1,7 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
-const U256 = @import("../primitives/uint.zig").U256;
 const types = @import("./types.zig");
+const uint_utils = @import("../primitives/uint.zig");
 
 /// ABI decoder for Ethereum smart contract responses
 pub const Decoder = struct {
@@ -28,17 +28,17 @@ pub const Decoder = struct {
     }
 
     /// Decode a uint256
-    pub fn decodeUint256(self: *Decoder) !U256 {
+    pub fn decodeUint256(self: *Decoder) !u256 {
         const bytes = try self.read32();
         var arr: [32]u8 = undefined;
         @memcpy(&arr, bytes);
-        return U256.fromBytes(arr);
+        return uint_utils.u256FromBytes(arr);
     }
 
     /// Decode a uint of any size
+    /// Alias for decodeUint256 for clarity
     pub fn decodeUint(self: *Decoder) !u256 {
-        const bytes = try self.read32();
-        return std.mem.readInt(u256, bytes[0..32], .big);
+        return self.decodeUint256();
     }
 
     /// Decode an address
@@ -148,7 +148,7 @@ test "decode uint256" {
     var decoder = Decoder.init(allocator, &data);
     const value = try decoder.decodeUint256();
 
-    try std.testing.expect(value.eql(U256.fromInt(42)));
+    try std.testing.expectEqual(@as(u256, 42), value);
 }
 
 test "decode address" {
@@ -206,7 +206,7 @@ test "decode multiple values" {
     var decoder = Decoder.init(allocator, &data);
 
     const val1 = try decoder.decodeUint256();
-    try std.testing.expect(val1.eql(U256.fromInt(100)));
+    try std.testing.expectEqual(@as(u256, 100), val1);
 
     const val2 = try decoder.decodeAddress();
     try std.testing.expectEqual(@as(u8, 0xAB), val2.bytes[0]);

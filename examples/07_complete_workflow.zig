@@ -130,12 +130,12 @@ pub fn main() !void {
         var tx = zigeth.types.Transaction.newEip1559(
             allocator,
             to,
-            zigeth.primitives.U256.fromInt(100_000_000_000_000_000), // 0.1 ETH
+            @as(u256, 100_000_000_000_000_000), // 0.1 ETH
             empty_data,
             0, // nonce (would be set by middleware)
             21000, // gas_limit
-            zigeth.primitives.U256.fromInt(50_000_000_000), // max_fee
-            zigeth.primitives.U256.fromInt(2_000_000_000), // priority_fee
+            @as(u256, 50_000_000_000), // max_fee
+            @as(u256, 2_000_000_000), // priority_fee
             11155111, // Sepolia
             null, // access_list
         );
@@ -271,7 +271,7 @@ pub fn main() !void {
     std.debug.print("  • zigeth.providers (Networks, HTTP, WebSocket)\n", .{});
     std.debug.print("  • zigeth.middleware (Gas, Nonce, Signer)\n", .{});
     std.debug.print("  • zigeth.types (Transaction, Receipt)\n", .{});
-    std.debug.print("  • zigeth.primitives (Address, Hash, U256)\n", .{});
+    std.debug.print("  • zigeth.primitives (Address, Hash, native u256)\n", .{});
     std.debug.print("  • zigeth.utils (Units, Hex, Format)\n\n", .{});
 
     std.debug.print("Benefits of using zigeth:\n", .{});

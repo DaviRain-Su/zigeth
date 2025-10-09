@@ -1,5 +1,5 @@
 const std = @import("std");
-const U256 = @import("../primitives/uint.zig").U256;
+const uint_utils = @import("../primitives/uint.zig");
 const Provider = @import("../providers/provider.zig").Provider;
 const Address = @import("../primitives/address.zig").Address;
 const Transaction = @import("../types/transaction.zig").Transaction;
@@ -15,8 +15,8 @@ pub const GasStrategy = enum {
 /// Gas price configuration
 pub const GasConfig = struct {
     strategy: GasStrategy,
-    max_fee_per_gas: ?U256,
-    max_priority_fee_per_gas: ?U256,
+    max_fee_per_gas: ?u256,
+    max_priority_fee_per_gas: ?u256,
     gas_limit: ?u64,
     multiplier: f64, // Multiplier for gas price (e.g., 1.1 = 110%)
 
@@ -50,7 +50,7 @@ pub const GasConfig = struct {
         };
     }
 
-    pub fn custom(max_fee: U256, max_priority_fee: U256) GasConfig {
+    pub fn custom(max_fee: u256, max_priority_fee: u256) GasConfig {
         return .{
             .strategy = .custom,
             .max_fee_per_gas = max_fee,
@@ -63,13 +63,13 @@ pub const GasConfig = struct {
 
 /// EIP-1559 fee data
 pub const FeeData = struct {
-    max_fee_per_gas: U256,
-    max_priority_fee_per_gas: U256,
-    base_fee_per_gas: U256,
+    max_fee_per_gas: u256,
+    max_priority_fee_per_gas: u256,
+    base_fee_per_gas: u256,
     last_block_number: u64,
 
-    pub fn estimatedCost(self: FeeData, gas_limit: u64) U256 {
-        return self.max_fee_per_gas.mulScalar(gas_limit);
+    pub fn estimatedCost(self: FeeData, gas_limit: u64) u256 {
+        return self.max_fee_per_gas * gas_limit;
     }
 };
 
@@ -95,13 +95,13 @@ pub const GasMiddleware = struct {
     }
 
     /// Get current gas price (legacy)
-    pub fn getGasPrice(self: *GasMiddleware) !U256 {
+    pub fn getGasPrice(self: *GasMiddleware) !u256 {
         const base_price = try self.provider.getGasPrice();
 
         // Apply multiplier
         const multiplier_int = @as(u64, @intFromFloat(self.config.multiplier * 100.0));
-        const adjusted_price = base_price.mulScalar(multiplier_int);
-        return adjusted_price.divScalar(100).quotient;
+        const adjusted_price = base_price * multiplier_int;
+        return adjusted_price / 100;
     }
 
     /// Get EIP-1559 fee data
@@ -121,7 +121,7 @@ pub const GasMiddleware = struct {
                     const fee_data = FeeData{
                         .max_fee_per_gas = max_fee,
                         .max_priority_fee_per_gas = max_priority,
-                        .base_fee_per_gas = if (max_fee.gte(max_priority)) max_fee.sub(max_priority) else U256.zero(),
+                        .base_fee_per_gas = if (max_fee >= max_priority) max_fee - max_priority else 0,
                         .last_block_number = try self.provider.getBlockNumber(),
                     };
                     self.cached_fee_data = fee_data;
@@ -146,7 +146,7 @@ pub const GasMiddleware = struct {
         const priority_fee = try self.calculatePriorityFee(base_fee);
 
         // Calculate max fee = base fee + priority fee
-        const max_fee = base_fee.add(priority_fee);
+        const max_fee = base_fee + priority_fee;
 
         const fee_data = FeeData{
             .max_fee_per_gas = max_fee,
@@ -163,19 +163,19 @@ pub const GasMiddleware = struct {
     }
 
     /// Calculate priority fee based on strategy
-    fn calculatePriorityFee(self: *GasMiddleware, base_fee: U256) !U256 {
+    fn calculatePriorityFee(self: *GasMiddleware, base_fee: u256) !u256 {
         _ = base_fee; // Reserved for future use
 
         // Try to get max priority fee from provider
         const suggested_priority = self.provider.eth.maxPriorityFeePerGas() catch {
             // Fallback: 2.5 gwei for standard, adjust for strategy
-            return U256.fromInt(2_500_000_000);
+            return @as(u256, 2_500_000_000);
         };
 
         // Apply strategy multiplier
         const multiplier_int = @as(u64, @intFromFloat(self.config.multiplier * 100.0));
-        const adjusted = suggested_priority.mulScalar(multiplier_int);
-        return adjusted.divScalar(100).quotient;
+        const adjusted = suggested_priority * multiplier_int;
+        return adjusted / 100;
     }
 
     /// Estimate gas limit for a transaction
@@ -224,7 +224,7 @@ pub const GasMiddleware = struct {
     }
 
     /// Calculate total transaction cost
-    pub fn calculateTxCost(self: *GasMiddleware, gas_limit: u64) !U256 {
+    pub fn calculateTxCost(self: *GasMiddleware, gas_limit: u64) !u256 {
         const fee_data = try self.getFeeData();
         return fee_data.estimatedCost(gas_limit);
     }
@@ -233,14 +233,14 @@ pub const GasMiddleware = struct {
     pub fn checkSufficientBalance(
         self: *GasMiddleware,
         from: Address,
-        value: U256,
+        value: u256,
         gas_limit: u64,
     ) !bool {
         const balance = try self.provider.getBalance(from);
         const tx_cost = try self.calculateTxCost(gas_limit);
-        const total_cost = value.add(tx_cost);
+        const total_cost = value + tx_cost;
 
-        return balance.gte(total_cost);
+        return balance >= total_cost;
     }
 
     /// Clear cached fee data
@@ -282,8 +282,8 @@ test "gas config fast" {
 }
 
 test "gas config custom" {
-    const max_fee = U256.fromInt(50_000_000_000);
-    const max_priority = U256.fromInt(2_000_000_000);
+    const max_fee = @as(u256, 50_000_000_000);
+    const max_priority = @as(u256, 2_000_000_000);
     const config = GasConfig.custom(max_fee, max_priority);
 
     try std.testing.expectEqual(GasStrategy.custom, config.strategy);
@@ -293,14 +293,14 @@ test "gas config custom" {
 
 test "fee data estimated cost" {
     const fee_data = FeeData{
-        .max_fee_per_gas = U256.fromInt(50_000_000_000), // 50 gwei
-        .max_priority_fee_per_gas = U256.fromInt(2_000_000_000), // 2 gwei
-        .base_fee_per_gas = U256.fromInt(48_000_000_000), // 48 gwei
+        .max_fee_per_gas = @as(u256, 50_000_000_000), // 50 gwei
+        .max_priority_fee_per_gas = @as(u256, 2_000_000_000), // 2 gwei
+        .base_fee_per_gas = @as(u256, 48_000_000_000), // 48 gwei
         .last_block_number = 1000,
     };
 
     const cost = fee_data.estimatedCost(21000); // Standard transfer gas
-    try std.testing.expect(cost.gt(U256.zero()));
+    try std.testing.expect(cost > 0);
 }
 
 test "gas middleware creation" {
@@ -339,9 +339,9 @@ test "gas middleware clear cache" {
     var middleware = GasMiddleware.init(allocator, &provider, config);
 
     middleware.cached_fee_data = FeeData{
-        .max_fee_per_gas = U256.fromInt(50_000_000_000),
-        .max_priority_fee_per_gas = U256.fromInt(2_000_000_000),
-        .base_fee_per_gas = U256.fromInt(48_000_000_000),
+        .max_fee_per_gas = @as(u256, 50_000_000_000),
+        .max_priority_fee_per_gas = @as(u256, 2_000_000_000),
+        .base_fee_per_gas = @as(u256, 48_000_000_000),
         .last_block_number = 1000,
     };
 

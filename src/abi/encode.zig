@@ -1,8 +1,8 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
-const U256 = @import("../primitives/uint.zig").U256;
 const Bytes = @import("../primitives/bytes.zig").Bytes;
 const types = @import("./types.zig");
+const uint_utils = @import("../primitives/uint.zig");
 
 /// ABI encoder for Ethereum smart contract calls
 pub const Encoder = struct {
@@ -21,16 +21,15 @@ pub const Encoder = struct {
     }
 
     /// Encode a uint256 value
-    pub fn encodeUint256(self: *Encoder, value: U256) !void {
-        const bytes = value.toBytes();
+    pub fn encodeUint256(self: *Encoder, value: u256) !void {
+        const bytes = uint_utils.u256ToBytes(value);
         try self.buffer.appendSlice(&bytes);
     }
 
     /// Encode a uint value of any size (padded to 32 bytes)
+    /// Alias for encodeUint256 for clarity
     pub fn encodeUint(self: *Encoder, value: u256) !void {
-        var bytes: [32]u8 = undefined;
-        std.mem.writeInt(u256, &bytes, value, .big);
-        try self.buffer.appendSlice(&bytes);
+        try self.encodeUint256(value);
     }
 
     /// Encode an int256 value
@@ -183,7 +182,7 @@ test "encode uint256" {
     var encoder = Encoder.init(allocator);
     defer encoder.deinit();
 
-    const value = U256.fromInt(42);
+    const value: u256 = 42;
     try encoder.encodeUint256(value);
 
     const result = encoder.toSlice();
