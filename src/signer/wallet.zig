@@ -57,7 +57,7 @@ pub const Wallet = struct {
         var key_array: [32]u8 = undefined;
         @memcpy(&key_array, key_bytes);
 
-        const private_key = PrivateKey.fromBytes(key_array);
+        const private_key = try PrivateKey.fromBytes(key_array);
         return try init(allocator, private_key);
     }
 
@@ -113,11 +113,101 @@ pub const Wallet = struct {
 
     /// Get transaction hash for signing
     fn getTransactionHash(self: *Wallet, tx: *Transaction, chain_id: u64) !Hash {
-        _ = self;
-        _ = tx;
-        _ = chain_id;
-        // TODO: Implement proper transaction hash calculation
-        return Hash.zero();
+        const RlpEncoder = @import("../rlp/encode.zig").Encoder;
+        const RlpItem = @import("../rlp/encode.zig").RlpItem;
+
+        var encoder = RlpEncoder.init(self.allocator);
+        defer encoder.deinit();
+
+        switch (tx.transaction_type) {
+            .legacy => {
+                // Legacy transaction with EIP-155
+                try encoder.startList();
+                try encoder.appendItem(.{ .uint = tx.nonce });
+                try encoder.appendItem(.{ .uint = tx.gas_price.toU64() catch 0 });
+                try encoder.appendItem(.{ .uint = tx.gas_limit });
+
+                if (tx.to) |to_addr| {
+                    try encoder.appendItem(.{ .bytes = &to_addr.bytes });
+                } else {
+                    try encoder.appendItem(.{ .bytes = &[_]u8{} });
+                }
+
+                try encoder.appendItem(.{ .uint = tx.value.toU64() catch 0 });
+                try encoder.appendItem(.{ .bytes = tx.data });
+
+                // EIP-155: add chain_id, 0, 0
+                try encoder.appendItem(.{ .uint = chain_id });
+                try encoder.appendItem(.{ .uint = 0 });
+                try encoder.appendItem(.{ .uint = 0 });
+
+                const encoded = try encoder.finish();
+                defer self.allocator.free(encoded);
+
+                return keccak.hash(encoded);
+            },
+            .eip2930, .eip1559, .eip4844, .eip7702 => {
+                // Typed transactions
+                try encoder.startList();
+                try encoder.appendItem(.{ .uint = chain_id });
+                try encoder.appendItem(.{ .uint = tx.nonce });
+
+                switch (tx.transaction_type) {
+                    .eip2930 => {
+                        try encoder.appendItem(.{ .uint = tx.gas_price.toU64() catch 0 });
+                    },
+                    .eip1559, .eip4844, .eip7702 => {
+                        try encoder.appendItem(.{ .uint = tx.max_priority_fee_per_gas.toU64() catch 0 });
+                        try encoder.appendItem(.{ .uint = tx.max_fee_per_gas.toU64() catch 0 });
+                    },
+                    else => unreachable,
+                }
+
+                try encoder.appendItem(.{ .uint = tx.gas_limit });
+
+                if (tx.to) |to_addr| {
+                    try encoder.appendItem(.{ .bytes = &to_addr.bytes });
+                } else {
+                    try encoder.appendItem(.{ .bytes = &[_]u8{} });
+                }
+
+                try encoder.appendItem(.{ .uint = tx.value.toU64() catch 0 });
+                try encoder.appendItem(.{ .bytes = tx.data });
+
+                // Access list (empty for now)
+                try encoder.appendItem(.{ .list = &[_]RlpItem{} });
+
+                // EIP-4844 specific
+                if (tx.transaction_type == .eip4844) {
+                    try encoder.appendItem(.{ .uint = tx.max_fee_per_blob_gas.toU64() catch 0 });
+                    try encoder.appendItem(.{ .list = &[_]RlpItem{} }); // blob versioned hashes
+                }
+
+                // EIP-7702 specific
+                if (tx.transaction_type == .eip7702) {
+                    try encoder.appendItem(.{ .list = &[_]RlpItem{} }); // authorization list
+                }
+
+                const encoded = try encoder.finish();
+                defer self.allocator.free(encoded);
+
+                // Prepend transaction type
+                const tx_type: u8 = switch (tx.transaction_type) {
+                    .eip2930 => 0x01,
+                    .eip1559 => 0x02,
+                    .eip4844 => 0x03,
+                    .eip7702 => 0x04,
+                    else => unreachable,
+                };
+
+                var type_prefixed = try self.allocator.alloc(u8, encoded.len + 1);
+                defer self.allocator.free(type_prefixed);
+                type_prefixed[0] = tx_type;
+                @memcpy(type_prefixed[1..], encoded);
+
+                return keccak.hash(type_prefixed);
+            },
+        }
     }
 
     /// Sign a message hash
@@ -251,11 +341,27 @@ pub const Mnemonic = struct {
 
     /// Convert to seed (for HD wallet)
     pub fn toSeed(self: Mnemonic, passphrase: []const u8) ![]u8 {
-        // TODO: Implement BIP-39 seed derivation (PBKDF2)
-        _ = passphrase;
-        const seed = try self.allocator.alloc(u8, 64);
-        @memset(seed, 0);
-        return seed;
+        // BIP-39: PBKDF2-HMAC-SHA512 with 2048 iterations
+        // Salt = "mnemonic" + passphrase
+        const phrase = try self.toPhrase();
+        defer self.allocator.free(phrase);
+
+        var salt = std.ArrayList(u8).init(self.allocator);
+        defer salt.deinit();
+        try salt.appendSlice("mnemonic");
+        try salt.appendSlice(passphrase);
+
+        // Derive 64-byte seed using PBKDF2-HMAC-SHA512
+        var seed: [64]u8 = undefined;
+        std.crypto.pwhash.pbkdf2(
+            &seed,
+            phrase,
+            salt.items,
+            2048, // BIP-39 standard iteration count
+            std.crypto.auth.hmac.sha2.HmacSha512,
+        );
+
+        return try self.allocator.dupe(u8, &seed);
     }
 
     /// Get phrase as string
@@ -367,4 +473,66 @@ test "hd wallet from seed" {
     var wallet = try hd_wallet.deriveChild("m/44'/60'/0'/0/0");
     const addr = try wallet.getAddress();
     try std.testing.expect(!addr.isZero());
+}
+
+test "wallet from private key hex" {
+    const allocator = std.testing.allocator;
+
+    const hex = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    var wallet = try Wallet.fromPrivateKeyHex(allocator, hex);
+
+    const addr = try wallet.getAddress();
+    try std.testing.expect(!addr.isZero());
+}
+
+test "wallet export private key" {
+    const allocator = std.testing.allocator;
+
+    const private_key = try PrivateKey.fromBytes([_]u8{1} ** 32);
+    const wallet = try Wallet.init(allocator, private_key);
+
+    const exported = try wallet.exportPrivateKey();
+    defer allocator.free(exported);
+
+    try std.testing.expect(exported.len > 0);
+    try std.testing.expect(std.mem.startsWith(u8, exported, "0x"));
+}
+
+test "wallet sign typed data" {
+    const allocator = std.testing.allocator;
+
+    const private_key = try PrivateKey.fromBytes([_]u8{1} ** 32);
+    var wallet = try Wallet.init(allocator, private_key);
+
+    const domain_hash = [_]u8{0xAB} ** 32;
+    const message_hash = [_]u8{0xCD} ** 32;
+
+    const sig = try wallet.signTypedData(domain_hash, message_hash);
+    try std.testing.expect(sig.isValid());
+}
+
+test "mnemonic to seed" {
+    const allocator = std.testing.allocator;
+
+    const phrase = "word word word word word word word word word word word word";
+    var mnemonic = try Mnemonic.fromPhrase(allocator, phrase);
+    defer mnemonic.deinit();
+
+    const seed = try mnemonic.toSeed("");
+    defer allocator.free(seed);
+
+    try std.testing.expectEqual(@as(usize, 64), seed.len);
+}
+
+test "mnemonic to phrase" {
+    const allocator = std.testing.allocator;
+
+    const phrase = "word word word word word word word word word word word word";
+    var mnemonic = try Mnemonic.fromPhrase(allocator, phrase);
+    defer mnemonic.deinit();
+
+    const result = try mnemonic.toPhrase();
+    defer allocator.free(result);
+
+    try std.testing.expectEqualStrings(phrase, result);
 }

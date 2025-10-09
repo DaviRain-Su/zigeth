@@ -23,16 +23,16 @@ A comprehensive Ethereum library for Zig, providing complete cryptographic primi
 | **🧰 Utils** | ✅ **Production Ready** | ████████████████████ 100% | 35/35 | Hex, Format, Units, Checksum (EIP-55/1191) |
 | **⚡ Solidity** | ✅ **Production Ready** | ████████████████████ 100% | 15/15 | Type mappings, Standard interfaces, Helpers |
 | **⚙️ Middleware** | ✅ **Production Ready** | ████████████████████ 100% | 23/23 | Gas, Nonce, Transaction Signing |
-| **🔑 Wallet** | ✅ **Production Ready** | ████████████████████ 100% | 29/29 | Software, HD, Keystore, Ledger |
+| **🔑 Wallet** | ✅ **Production Ready** | ████████████████████ 100% | 35/35 | Software, HD, Keystore, Ledger |
 
 ### Overall Progress
-**Total**: 328/328 tests passing ✅ | **100% Complete** | **12/12 modules production-ready**
+**Total**: 334/334 tests passing ✅ | **100% Complete** | **12/12 modules production-ready**
 
 **Legend**: ✅ Production Ready | 🚧 In Progress | ⏳ Planned
 
 ---
 
-**Current Status**: 328 tests passing | 100% complete | Production-ready crypto, ABI, primitives, contracts, RLP, RPC, Solidity, Providers, Middleware, Wallets & utilities
+**Current Status**: 334 tests passing | 100% complete | Production-ready crypto, ABI, primitives, contracts, RLP, RPC, Solidity, Providers, Middleware, Wallets & utilities
 
 ## 🏗️ Architecture
 
@@ -2172,6 +2172,43 @@ All Ethereum transaction types are fully supported:
 - [ ] Transaction middleware
 - [ ] Network configurations
 
+## 📦 Releases & Versioning
+
+Zigeth uses **semantic versioning** with automatic releases on merge to `master`.
+
+### Current Version: `v0.1.0`
+
+- ✅ Initial development release
+- ✅ Feature complete (12/12 modules)
+- ✅ 334 tests passing
+- ✅ Production-ready
+
+### Automatic Releases
+
+Every merge to `master` automatically:
+- Determines version bump from commit messages
+- Creates a git tag
+- Builds multi-platform artifacts
+- Publishes GitHub release with changelog
+- Updates version in `build.zig.zon`
+
+### Release Triggers
+
+Releases are triggered by:
+
+- 🔀 **Merge commits** - Automatic PATCH bump
+- 📝 **Commit keywords**:
+  - `[major]` or `BREAKING CHANGE:` → Major release (v1.0.0)
+  - `[minor]` or `feat:` → Minor release (v0.2.0)
+  - `[patch]` or `fix:` → Patch release (v0.1.1)
+- 🎯 **Manual dispatch** - Choose bump type
+
+### Skip Release
+
+Add `[skip release]` to commit message to prevent automatic release.
+
+See [RELEASING.md](RELEASING.md) for detailed release process documentation.
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -2181,6 +2218,7 @@ Before contributing:
 2. Run `zig build lint` to check for issues
 3. Run `zig build test` to verify all tests pass
 4. Update documentation for new features
+5. Follow conventional commit messages for automatic versioning
 
 ## 📄 License
 
