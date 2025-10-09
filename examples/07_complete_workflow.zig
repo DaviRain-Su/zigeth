@@ -103,10 +103,10 @@ pub fn main() !void {
 
         // Gas middleware (fast confirmation)
         const gas_config = zigeth.middleware.GasConfig.fast();
-        const gas = zigeth.middleware.GasMiddleware.init(allocator, &provider, gas_config);
+        const gas = zigeth.middleware.GasMiddleware.init(allocator, provider.getProvider(), gas_config);
 
         // Nonce middleware (hybrid strategy)
-        var nonce = try zigeth.middleware.NonceMiddleware.init(allocator, &provider, .hybrid);
+        var nonce = try zigeth.middleware.NonceMiddleware.init(allocator, provider.getProvider(), .hybrid);
         defer nonce.deinit();
 
         std.debug.print("✅ Middleware ready\n", .{});
@@ -123,20 +123,29 @@ pub fn main() !void {
     {
         std.debug.print("Building EIP-1559 transaction...\n", .{});
 
-        var tx = zigeth.types.Transaction.newEip1559(allocator);
-
         const from = try zigeth.primitives.Address.fromHex("0x0000000000000000000000000000000000000001");
         const to = try zigeth.primitives.Address.fromHex("0x0000000000000000000000000000000000000002");
+        const empty_data = try zigeth.primitives.Bytes.fromSlice(allocator, &[_]u8{});
+
+        var tx = zigeth.types.Transaction.newEip1559(
+            allocator,
+            to,
+            zigeth.primitives.U256.fromInt(100_000_000_000_000_000), // 0.1 ETH
+            empty_data,
+            0, // nonce (would be set by middleware)
+            21000, // gas_limit
+            zigeth.primitives.U256.fromInt(50_000_000_000), // max_fee
+            zigeth.primitives.U256.fromInt(2_000_000_000), // priority_fee
+            11155111, // Sepolia
+            null, // access_list
+        );
 
         tx.from = from;
-        tx.to = to;
-        tx.value = zigeth.primitives.U256.fromInt(100_000_000_000_000_000); // 0.1 ETH
-        tx.data = &[_]u8{};
 
         std.debug.print("✅ Transaction created\n", .{});
         std.debug.print("   Type: EIP-1559\n", .{});
-        std.debug.print("   From: {}\n", .{tx.from});
-        std.debug.print("   To: {}\n", .{tx.to.?});
+        std.debug.print("   From: {any}\n", .{tx.from});
+        std.debug.print("   To: {any}\n", .{tx.to.?});
         std.debug.print("   Value: 0.1 ETH\n\n", .{});
     }
 

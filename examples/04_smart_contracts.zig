@@ -50,14 +50,14 @@ pub fn main() !void {
             .inputs = &[_]zigeth.abi.Parameter{
                 .{
                     .name = "account",
-                    .type = try zigeth.abi.AbiType.parse(allocator, "address"),
+                    .type = .address,
                     .indexed = false,
                 },
             },
             .outputs = &[_]zigeth.abi.Parameter{
                 .{
                     .name = "balance",
-                    .type = try zigeth.abi.AbiType.parse(allocator, "uint256"),
+                    .type = .uint256,
                     .indexed = false,
                 },
             },
@@ -67,13 +67,13 @@ pub fn main() !void {
         // Encode call
         const check_address = try zigeth.primitives.Address.fromHex("0x0000000000000000000000000000000000000001");
         const params = [_]zigeth.abi.AbiValue{
-            .{ .address = check_address })
+            .{ .address = check_address },
         };
 
         const encoded = try zigeth.abi.encodeFunctionCall(
-            
-            balance_of)
-            &params)
+            allocator,
+            balance_of,
+            &params,
         );
         defer allocator.free(encoded);
 
@@ -166,10 +166,10 @@ pub fn main() !void {
 
         // Create filter for Transfer events
         const filter = zigeth.rpc.FilterOptions{
-            .address = usdc_address)
+            .address = usdc_address,
             .topics = null, // Could filter by specific addresses
-            .from_block = null)
-            .to_block = null)
+            .from_block = null,
+            .to_block = null,
         };
 
         _ = filter; // Would be used with provider.eth.getLogs(filter)
