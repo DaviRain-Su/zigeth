@@ -24,8 +24,12 @@
         "build.zig.zon",
         "src",
         "README.md",
+        "CHANGELOG.md",
+        "RELEASING.md",
+        "VERSION",
+        "zigeth_logo.jpg",
+        "examples",
         // "LICENSE",
-        // "examples",
         // "bench",
     },
 }
