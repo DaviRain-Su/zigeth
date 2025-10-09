@@ -19,6 +19,9 @@ jobs:
         with:
           version: 0.14.1
 
+      - name: Create cache directory
+        run: mkdir -p $HOME/.cache/zig
+
       - name: Check formatting
         run: zig build fmt-check
 
@@ -42,14 +45,24 @@ jobs:
         with:
           version: 0.14.1
 
+      - name: Create cache directory (Unix)
+        if: runner.os != 'Windows'
+        run: mkdir -p $HOME/.cache/zig
+
+      - name: Create cache directory (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: New-Item -Path "$env:LOCALAPPDATA\zig" -ItemType Directory -Force
+
       - name: Cache Zig artifacts
         uses: actions/cache@v4
         with:
           path: |
-            zig-cache
+            .zig-cache
             zig-out
-          key: ${{ runner.os }}-zig-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          key: ${{ runner.os }}-zig-test-${{ hashFiles('build.zig', 'build.zig.zon', 'src/**/*.zig') }}
           restore-keys: |
+            ${{ runner.os }}-zig-test-
             ${{ runner.os }}-zig-
 
       - name: Build library
@@ -76,15 +89,25 @@ jobs:
         with:
           version: 0.14.1
 
+      - name: Create cache directory (Unix)
+        if: runner.os != 'Windows'
+        run: mkdir -p $HOME/.cache/zig
+
+      - name: Create cache directory (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: New-Item -Path "$env:LOCALAPPDATA\zig" -ItemType Directory -Force
+
       - name: Cache Zig artifacts
         uses: actions/cache@v4
         with:
           path: |
-            zig-cache
+            .zig-cache
             zig-out
-          key: ${{ runner.os }}-zig-${{ matrix.optimize }}-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          key: ${{ runner.os }}-zig-${{ matrix.optimize }}-${{ hashFiles('build.zig', 'build.zig.zon', 'src/**/*.zig') }}
           restore-keys: |
             ${{ runner.os }}-zig-${{ matrix.optimize }}-
+            ${{ runner.os }}-zig-
 
       - name: Build (${{ matrix.optimize }})
         run: zig build -Doptimize=${{ matrix.optimize }}
@@ -100,6 +123,9 @@ jobs:
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.14.1
+
+      - name: Create cache directory
+        run: mkdir -p $HOME/.cache/zig
 
       - name: Run tests with coverage
         run: zig build test
@@ -120,6 +146,9 @@ jobs:
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.14.1
+
+      - name: Create cache directory
+        run: mkdir -p $HOME/.cache/zig
 
       - name: Build documentation
         run: zig build docs
