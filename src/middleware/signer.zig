@@ -50,7 +50,7 @@ pub const SignerMiddleware = struct {
 
     /// Create a new signer middleware
     pub fn init(allocator: std.mem.Allocator, private_key: PrivateKey, config: SignerConfig) !SignerMiddleware {
-        const signer = try Signer.init(allocator, private_key);
+        const signer = Signer.init(private_key);
 
         return .{
             .private_key = private_key,

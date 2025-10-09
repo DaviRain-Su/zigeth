@@ -38,10 +38,9 @@ pub fn main() !void {
     std.debug.print("────────────────────────────\n", .{});
     {
         const chain_id = try provider.getChainId();
-        const network_id = try provider.getNetworkId();
-
+        
         std.debug.print("✅ Chain ID: {d}\n", .{chain_id});
-        std.debug.print("   Network ID: {d}\n\n", .{network_id});
+        std.debug.print("   Network: Ethereum Mainnet\n\n", .{});
     }
 
     // Example 3: Query account balance
@@ -50,7 +49,6 @@ pub fn main() !void {
     {
         // Vitalik's address - simple string literal!
         const address = try zigeth.primitives.Address.fromHex(
-            allocator,
             "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
         );
 
@@ -76,7 +74,7 @@ pub fn main() !void {
         std.debug.print("✅ Gas price: {} wei\n", .{gas_price});
 
         // Convert to gwei
-        const gas_u64 = try gas_price.toU64();
+        const gas_u64 = gas_price.toU64();
         const gwei = @as(f64, @floatFromInt(gas_u64)) / 1_000_000_000.0;
         std.debug.print("   Gas price: {d:.2} gwei\n\n", .{gwei});
     }
@@ -110,7 +108,7 @@ pub fn main() !void {
     {
         // Vitalik's address
         const address = try zigeth.primitives.Address.fromHex(
-            allocator,
+            
             "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
         );
 
@@ -129,7 +127,7 @@ pub fn main() !void {
     {
         // USDT contract on Ethereum
         const usdt_address = try zigeth.primitives.Address.fromHex(
-            allocator,
+            
             "0xdAC17F958D2ee523a2206206994597C13D831ec7"
         );
 

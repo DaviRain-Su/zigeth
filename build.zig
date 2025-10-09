@@ -22,7 +22,11 @@ pub fn build(b: *std.Build) void {
     });
 
     // Add secp256k1 dependency to module
-    zigeth_mod.addImport("secp256k1", secp256k1_dep.module("zig-eth-secp256k1"));
+    const secp256k1_mod = secp256k1_dep.module("zig-eth-secp256k1");
+    zigeth_mod.addImport("secp256k1", secp256k1_mod);
+
+    // Get the secp256k1 artifact for linking
+    const secp256k1_artifact = secp256k1_dep.artifact("secp256k1");
 
     // Build static library
     const lib = b.addStaticLibrary(.{
@@ -34,6 +38,7 @@ pub fn build(b: *std.Build) void {
 
     // Link libc (required for some std library functions)
     lib.linkLibC();
+    lib.linkLibrary(secp256k1_artifact);
 
     b.installArtifact(lib);
 
@@ -47,6 +52,7 @@ pub fn build(b: *std.Build) void {
 
     exe.root_module.addImport("zigeth", zigeth_mod);
     exe.linkLibC();
+    exe.linkLibrary(secp256k1_artifact);
 
     b.installArtifact(exe);
 
@@ -68,6 +74,7 @@ pub fn build(b: *std.Build) void {
     });
 
     lib_unit_tests.linkLibC();
+    lib_unit_tests.linkLibrary(secp256k1_artifact);
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
@@ -80,6 +87,7 @@ pub fn build(b: *std.Build) void {
 
     exe_unit_tests.root_module.addImport("zigeth", zigeth_mod);
     exe_unit_tests.linkLibC();
+    exe_unit_tests.linkLibrary(secp256k1_artifact);
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
@@ -142,6 +150,7 @@ pub fn build(b: *std.Build) void {
 
             example_exe.root_module.addImport("zigeth", zigeth_mod);
             example_exe.linkLibC();
+            example_exe.linkLibrary(secp256k1_artifact);
 
             const install_example = b.addInstallArtifact(example_exe, .{
                 .dest_dir = .{
@@ -208,6 +217,7 @@ pub fn build(b: *std.Build) void {
     });
     lint_exe.root_module.addImport("zigeth", zigeth_mod);
     lint_exe.linkLibC();
+    lint_exe.linkLibrary(secp256k1_artifact);
 
     const lint_exe_check = b.addInstallArtifact(lint_exe, .{
         .dest_dir = .{ .override = .{ .custom = "lint" } },

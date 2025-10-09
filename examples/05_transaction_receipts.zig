@@ -84,7 +84,7 @@ pub fn main() !void {
         std.debug.print("   Total fee: {} wei\n", .{fee});
 
         // Convert to ETH
-        const fee_u64 = try fee.toU64();
+        const fee_u64 = fee.toU64();
         const fee_eth = @as(f64, @floatFromInt(fee_u64)) / 1_000_000_000_000_000_000.0;
         std.debug.print("   Total fee: {d:.6} ETH\n\n", .{fee_eth});
     }

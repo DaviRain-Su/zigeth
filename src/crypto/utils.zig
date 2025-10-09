@@ -4,14 +4,14 @@ const Address = @import("../primitives/address.zig").Address;
 const keccak = @import("./keccak.zig");
 
 /// Generate a random 32-byte value
-pub fn randomBytes32(random: std.rand.Random) [32]u8 {
+pub fn randomBytes32(random: std.Random) [32]u8 {
     var bytes: [32]u8 = undefined;
     random.bytes(&bytes);
     return bytes;
 }
 
 /// Generate random bytes of any length
-pub fn randomBytes(allocator: std.mem.Allocator, random: std.rand.Random, len: usize) ![]u8 {
+pub fn randomBytes(allocator: std.mem.Allocator, random: std.Random, len: usize) ![]u8 {
     const bytes = try allocator.alloc(u8, len);
     random.bytes(bytes);
     return bytes;
@@ -212,7 +212,7 @@ pub fn checksumAddressEip1191(
 }
 
 test "random bytes generation" {
-    var prng = std.rand.DefaultPrng.init(0);
+    var prng = std.Random.DefaultPrng.init(0);
     const random = prng.random();
 
     const bytes1 = randomBytes32(random);

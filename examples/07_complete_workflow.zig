@@ -74,7 +74,7 @@ pub fn main() !void {
         std.debug.print("Checking account balance...\n", .{});
 
         // Simulated balance check - using simple hex string!
-        const address = try zigeth.primitives.Address.fromHex(allocator, "0x0000000000000000000000000000000000000001");
+        const address = try zigeth.primitives.Address.fromHex("0x0000000000000000000000000000000000000001");
 
         std.debug.print("✅ Balance check\n", .{});
         std.debug.print("   Account: {}\n", .{address});
@@ -103,7 +103,7 @@ pub fn main() !void {
 
         // Gas middleware (fast confirmation)
         const gas_config = zigeth.middleware.GasConfig.fast();
-        var gas = zigeth.middleware.GasMiddleware.init(allocator, &provider, gas_config);
+        const gas = zigeth.middleware.GasMiddleware.init(allocator, &provider, gas_config);
 
         // Nonce middleware (hybrid strategy)
         var nonce = try zigeth.middleware.NonceMiddleware.init(allocator, &provider, .hybrid);
@@ -125,8 +125,8 @@ pub fn main() !void {
 
         var tx = zigeth.types.Transaction.newEip1559(allocator);
 
-        const from = try zigeth.primitives.Address.fromHex(allocator, "0x0000000000000000000000000000000000000001");
-        const to = try zigeth.primitives.Address.fromHex(allocator, "0x0000000000000000000000000000000000000002");
+        const from = try zigeth.primitives.Address.fromHex("0x0000000000000000000000000000000000000001");
+        const to = try zigeth.primitives.Address.fromHex("0x0000000000000000000000000000000000000002");
 
         tx.from = from;
         tx.to = to;

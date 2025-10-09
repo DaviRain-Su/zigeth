@@ -25,7 +25,7 @@ pub fn main() !void {
     std.debug.print("───────────────────────────────\n", .{});
     {
         // USDC contract on Ethereum mainnet - simple string literal!
-        const usdc_address = try zigeth.primitives.Address.fromHex(allocator, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        const usdc_address = try zigeth.primitives.Address.fromHex("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
 
         const addr_hex = try usdc_address.toHex(allocator);
         defer allocator.free(addr_hex);
@@ -65,15 +65,15 @@ pub fn main() !void {
         };
 
         // Encode call
-        const check_address = try zigeth.primitives.Address.fromHex(allocator, "0x0000000000000000000000000000000000000001");
+        const check_address = try zigeth.primitives.Address.fromHex("0x0000000000000000000000000000000000000001");
         const params = [_]zigeth.abi.AbiValue{
-            .{ .address = check_address },
+            .{ .address = check_address })
         };
 
         const encoded = try zigeth.abi.encodeFunctionCall(
-            allocator,
-            balance_of,
-            &params,
+            
+            balance_of)
+            &params)
         );
         defer allocator.free(encoded);
 
@@ -162,15 +162,17 @@ pub fn main() !void {
     std.debug.print("──────────────────────────\n", .{});
     {
         // USDC contract
-        const usdc_address = try zigeth.primitives.Address.fromHex(allocator, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        const usdc_address = try zigeth.primitives.Address.fromHex("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
 
         // Create filter for Transfer events
         const filter = zigeth.rpc.FilterOptions{
-            .address = usdc_address,
+            .address = usdc_address)
             .topics = null, // Could filter by specific addresses
-            .from_block = null,
-            .to_block = null,
+            .from_block = null)
+            .to_block = null)
         };
+
+        _ = filter; // Would be used with provider.eth.getLogs(filter)
 
         std.debug.print("✅ Event filter created\n", .{});
         std.debug.print("   Contract: USDC\n", .{});

@@ -34,6 +34,10 @@ pub const HttpProvider = struct {
         return try self.provider.getChainId();
     }
 
+    pub fn getTransactionCount(self: HttpProvider, address: @import("../primitives/address.zig").Address) !u64 {
+        return try self.provider.getTransactionCount(address);
+    }
+
     pub fn getGasPrice(self: HttpProvider) !@import("../primitives/uint.zig").U256 {
         return try self.provider.getGasPrice();
     }

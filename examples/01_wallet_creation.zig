@@ -157,8 +157,8 @@ pub fn main() !void {
         std.debug.print("✅ Signed message: \"{s}\"\n", .{message});
         std.debug.print("   Signature valid: {}\n", .{signature.isValid()});
         std.debug.print("   v: {}\n", .{signature.v});
-        std.debug.print("   r: {}\n", .{signature.r});
-        std.debug.print("   s: {}\n\n", .{signature.s});
+        std.debug.print("   r: {any}\n", .{signature.r});
+        std.debug.print("   s: {any}\n\n", .{signature.s});
     }
 
     std.debug.print("🎉 All wallet examples completed!\n\n", .{});

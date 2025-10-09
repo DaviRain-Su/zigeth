@@ -49,7 +49,7 @@ pub fn main() !void {
 
         tx.from = from_address;
         tx.to = try zigeth.primitives.Address.fromHex(
-            allocator,
+            
             "0x9999999999999999999999999999999999999999"
         );
         tx.value = zigeth.primitives.U256.fromInt(1_000_000_000_000_000); // 0.001 ETH
@@ -73,7 +73,7 @@ pub fn main() !void {
 
         tx.from = from_address;
         tx.to = try zigeth.primitives.Address.fromHex(
-            allocator,
+            
             "0x8888888888888888888888888888888888888888"
         );
         tx.value = zigeth.primitives.U256.fromInt(1_000_000_000_000_000); // 0.001 ETH
@@ -112,7 +112,7 @@ pub fn main() !void {
         var tx = zigeth.types.Transaction.newEip1559(allocator);
         tx.from = from_address;
         tx.to = try zigeth.primitives.Address.fromHex(
-            allocator,
+            
             "0x7777777777777777777777777777777777777777"
         );
         tx.value = zigeth.primitives.U256.fromInt(1_000_000_000_000_000);
@@ -148,7 +148,7 @@ pub fn main() !void {
         var tx = zigeth.types.Transaction.newEip1559(allocator);
         tx.from = from_address;
         tx.to = try zigeth.primitives.Address.fromHex(
-            allocator,
+            
             "0x6666666666666666666666666666666666666666"
         );
         tx.value = zigeth.primitives.U256.fromInt(1_000_000_000_000_000);
