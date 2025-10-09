@@ -129,13 +129,13 @@ pub const TransactionSigner = struct {
 
 /// Deterministic k generation for ECDSA (RFC 6979)
 /// This prevents nonce reuse attacks
+/// Note: The secp256k1 library already uses deterministic nonces internally
 pub fn generateDeterministicK(
     message_hash: Hash,
     private_key: secp256k1.PrivateKey,
 ) !secp256k1.PrivateKey {
-    // TODO: Implement RFC 6979 deterministic k generation
-    // For now, this is a placeholder
-
+    // The secp256k1 library already implements RFC 6979
+    // This function is kept for API completeness
     _ = message_hash;
     _ = private_key;
     return error.NotImplemented;

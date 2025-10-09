@@ -46,6 +46,15 @@ jobs:
         with:
           version: 0.14.1
 
+      - name: Create cache directories (Unix)
+        if: runner.os != 'Windows'
+        run: mkdir -p .zig-cache/global
+
+      - name: Create cache directories (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: New-Item -Path ".zig-cache/global" -ItemType Directory -Force
+
       - name: Build Release
         run: zig build -Doptimize=ReleaseFast
 
