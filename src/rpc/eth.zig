@@ -22,6 +22,7 @@ pub const EthNamespace = struct {
     /// eth_blockNumber - Returns the current block number
     pub fn blockNumber(self: EthNamespace) !u64 {
         const result = try self.client.callNoParams("eth_blockNumber");
+        defer @import("./free_json.zig").freeJsonValue(self.client.allocator, result);
 
         // Parse hex string to u64
         if (result != .string) {
@@ -391,6 +392,7 @@ pub const EthNamespace = struct {
     /// eth_chainId - Returns the chain ID
     pub fn chainId(self: EthNamespace) !u64 {
         const result = try self.client.callNoParams("eth_chainId");
+        defer @import("./free_json.zig").freeJsonValue(self.client.allocator, result);
 
         if (result != .string) {
             return error.InvalidResponse;
