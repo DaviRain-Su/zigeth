@@ -444,11 +444,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.determine-release.outputs.new_version }}
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
 
       - name: Update build.zig.zon version
         run: |
@@ -457,22 +459,35 @@ jobs:
           # Update version in build.zig.zon
           sed -i "s/\.version = \"[^\"]*\"/\.version = \"$VERSION\"/" build.zig.zon
           
-          echo "✅ Updated version to $VERSION in build.zig.zon"
-          cat build.zig.zon
+          # Update VERSION file
+          echo "$VERSION" > VERSION
+          
+          echo "✅ Updated version to $VERSION"
 
-      - name: Commit and push version update
-        run: |
-          NEW_VERSION="${{ needs.determine-release.outputs.new_version }}"
-          
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git add build.zig.zon
-          
-          if git diff --staged --quiet; then
-            echo "ℹ️  No changes to commit"
-          else
-            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-            git push origin HEAD:${{ github.ref_name }}
-            echo "✅ Pushed version update"
-          fi
+      - name: Create Pull Request for version update
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "chore: bump version to ${{ needs.determine-release.outputs.new_version }}"
+          branch: "release/version-${{ needs.determine-release.outputs.new_version }}"
+          delete-branch: true
+          title: "chore: bump version to ${{ needs.determine-release.outputs.new_version }}"
+          body: |
+            🤖 **Automated version bump**
+            
+            This PR updates the version to `${{ needs.determine-release.outputs.new_version }}` following the release.
+            
+            ## Changes
+            - Updated `build.zig.zon` version
+            - Updated `VERSION` file
+            
+            ## Release
+            - Release: [${{ needs.determine-release.outputs.new_version }}](https://github.com/${{ github.repository }}/releases/tag/${{ needs.determine-release.outputs.new_version }})
+            
+            ---
+            
+            This PR can be safely merged or closed if you prefer to keep versions in sync manually.
+          labels: |
+            automated
+            release
+            chore
+          assignees: ${{ github.actor }}
