@@ -155,13 +155,57 @@ pub const sol = struct {
     pub const ValueConversion = macros.ValueConversion;
 };
 
-pub const signer = @import("signer/wallet.zig");
+pub const signer = struct {
+    const signer_mod = @import("signer/signer.zig");
+    const wallet_mod = @import("signer/wallet.zig");
+    const keystore_mod = @import("signer/keystore.zig");
+    const ledger_mod = @import("signer/ledger.zig");
+
+    pub const SignerInterface = signer_mod.SignerInterface;
+    pub const SignerType = signer_mod.SignerType;
+    pub const SignerCapabilities = signer_mod.SignerCapabilities;
+    pub const signerInterface = signer_mod.signerInterface;
+
+    pub const Wallet = wallet_mod.Wallet;
+    pub const HDWallet = wallet_mod.HDWallet;
+    pub const Mnemonic = wallet_mod.Mnemonic;
+
+    pub const Keystore = keystore_mod.Keystore;
+    pub const KeystoreVersion = keystore_mod.KeystoreVersion;
+    pub const KdfType = keystore_mod.KdfType;
+    pub const CipherType = keystore_mod.CipherType;
+    pub const ScryptParams = keystore_mod.ScryptParams;
+    pub const Pbkdf2Params = keystore_mod.Pbkdf2Params;
+
+    pub const LedgerWallet = ledger_mod.LedgerWallet;
+    pub const LedgerModel = ledger_mod.LedgerModel;
+    pub const DerivationPath = ledger_mod.DerivationPath;
+    pub const APDU = ledger_mod.APDU;
+};
 
 pub const utils = struct {
     pub const hex = @import("utils/hex.zig");
     pub const format = @import("utils/format.zig");
     pub const units = @import("utils/units.zig");
     pub const checksum = @import("utils/checksum.zig");
+};
+
+pub const middleware = struct {
+    const gas_mod = @import("middleware/gas.zig");
+    const nonce_mod = @import("middleware/nonce.zig");
+    const signer_mod = @import("middleware/signer.zig");
+
+    pub const GasStrategy = gas_mod.GasStrategy;
+    pub const GasConfig = gas_mod.GasConfig;
+    pub const FeeData = gas_mod.FeeData;
+    pub const GasMiddleware = gas_mod.GasMiddleware;
+
+    pub const NonceStrategy = nonce_mod.NonceStrategy;
+    pub const PendingTransaction = nonce_mod.PendingTransaction;
+    pub const NonceMiddleware = nonce_mod.NonceMiddleware;
+
+    pub const SignerConfig = signer_mod.SignerConfig;
+    pub const SignerMiddleware = signer_mod.SignerMiddleware;
 };
 
 test {
