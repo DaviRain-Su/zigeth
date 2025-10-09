@@ -6,7 +6,6 @@
 /// - Retrieve transactions
 /// - Check transaction receipts
 /// - Query gas prices
-
 const std = @import("std");
 const zigeth = @import("zigeth");
 
@@ -38,7 +37,7 @@ pub fn main() !void {
     std.debug.print("────────────────────────────\n", .{});
     {
         const chain_id = try provider.getChainId();
-        
+
         std.debug.print("✅ Chain ID: {d}\n", .{chain_id});
         std.debug.print("   Network: Ethereum Mainnet\n\n", .{});
     }
@@ -48,9 +47,7 @@ pub fn main() !void {
     std.debug.print("──────────────────────────\n", .{});
     {
         // Vitalik's address - simple string literal!
-        const address = try zigeth.primitives.Address.fromHex(
-            "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
-        );
+        const address = try zigeth.primitives.Address.fromHex("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
 
         const balance = try provider.getBalance(address);
 
@@ -107,10 +104,7 @@ pub fn main() !void {
     std.debug.print("────────────────────────────\n", .{});
     {
         // Vitalik's address
-        const address = try zigeth.primitives.Address.fromHex(
-            
-            "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
-        );
+        const address = try zigeth.primitives.Address.fromHex("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
 
         const nonce = try provider.getTransactionCount(address);
 
@@ -126,10 +120,7 @@ pub fn main() !void {
     std.debug.print("──────────────────────────────\n", .{});
     {
         // USDT contract on Ethereum
-        const usdt_address = try zigeth.primitives.Address.fromHex(
-            
-            "0xdAC17F958D2ee523a2206206994597C13D831ec7"
-        );
+        const usdt_address = try zigeth.primitives.Address.fromHex("0xdAC17F958D2ee523a2206206994597C13D831ec7");
 
         const is_contract = try provider.isContract(usdt_address);
 
@@ -144,32 +135,35 @@ pub fn main() !void {
     std.debug.print("Example 8: Multi-Chain Queries\n", .{});
     std.debug.print("───────────────────────────────\n", .{});
     {
-        // Connect to different networks
-        const networks = [_]struct {
-            name: []const u8,
-            provider_fn: fn (std.mem.Allocator) anyerror!zigeth.providers.HttpProvider,
-        }{
-            .{ .name = "Ethereum", .provider_fn = zigeth.providers.Networks.mainnet },
-            .{ .name = "Polygon", .provider_fn = zigeth.providers.Networks.polygon },
-            .{ .name = "Arbitrum", .provider_fn = zigeth.providers.Networks.arbitrum },
-        };
-
-        for (networks) |network| {
-            var net_provider = try network.provider_fn(allocator);
-            defer net_provider.deinit();
-
-            const chain_id = try net_provider.getChainId();
-            const block_num = try net_provider.getBlockNumber();
-
-            std.debug.print("✅ {s}: Chain ID {d}, Block #{d}\n", .{
-                network.name,
-                chain_id,
-                block_num,
-            });
+        // Query Ethereum Mainnet
+        {
+            var eth_provider = try zigeth.providers.Networks.mainnet(allocator);
+            defer eth_provider.deinit();
+            const chain_id = try eth_provider.getChainId();
+            const block_num = try eth_provider.getBlockNumber();
+            std.debug.print("✅ Ethereum: Chain ID {d}, Block #{d}\n", .{ chain_id, block_num });
         }
+
+        // Query Polygon
+        {
+            var polygon_provider = try zigeth.providers.Networks.polygon(allocator);
+            defer polygon_provider.deinit();
+            const chain_id = try polygon_provider.getChainId();
+            const block_num = try polygon_provider.getBlockNumber();
+            std.debug.print("✅ Polygon: Chain ID {d}, Block #{d}\n", .{ chain_id, block_num });
+        }
+
+        // Query Arbitrum
+        {
+            var arb_provider = try zigeth.providers.Networks.arbitrum(allocator);
+            defer arb_provider.deinit();
+            const chain_id = try arb_provider.getChainId();
+            const block_num = try arb_provider.getBlockNumber();
+            std.debug.print("✅ Arbitrum: Chain ID {d}, Block #{d}\n", .{ chain_id, block_num });
+        }
+
         std.debug.print("\n", .{});
     }
 
     std.debug.print("🎉 All blockchain query examples completed!\n\n", .{});
 }
-

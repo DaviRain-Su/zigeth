@@ -6,7 +6,6 @@
 /// - Wait for confirmations
 /// - Check transaction status
 /// - Use middleware for automation
-
 const std = @import("std");
 const zigeth = @import("zigeth");
 
@@ -45,48 +44,54 @@ pub fn main() !void {
     std.debug.print("Example 1: Legacy Transaction\n", .{});
     std.debug.print("─────────────────────────────\n", .{});
     {
-        var tx = zigeth.types.Transaction.newLegacy(allocator);
+        const to_address = try zigeth.primitives.Address.fromHex("0x9999999999999999999999999999999999999999");
+        const empty_data = try zigeth.primitives.Bytes.fromSlice(allocator, &[_]u8{});
+
+        var tx = zigeth.types.Transaction.newLegacy(
+            allocator,
+            to_address,
+            zigeth.primitives.U256.fromInt(1_000_000_000_000_000), // 0.001 ETH
+            empty_data,
+            0, // nonce
+            21000, // gas_limit
+            zigeth.primitives.U256.fromInt(20_000_000_000), // 20 gwei gas_price
+        );
 
         tx.from = from_address;
-        tx.to = try zigeth.primitives.Address.fromHex(
-            
-            "0x9999999999999999999999999999999999999999"
-        );
-        tx.value = zigeth.primitives.U256.fromInt(1_000_000_000_000_000); // 0.001 ETH
-        tx.gas_limit = 21000;
-        tx.gas_price = zigeth.primitives.U256.fromInt(20_000_000_000); // 20 gwei
-        tx.nonce = 0; // Would get from provider in production
-        tx.data = &[_]u8{};
 
         std.debug.print("✅ Created legacy transaction\n", .{});
-        std.debug.print("   To: {}\n", .{tx.to.?});
+        std.debug.print("   To: {any}\n", .{tx.to.?});
         std.debug.print("   Value: {} wei\n", .{tx.value});
         std.debug.print("   Gas limit: {d}\n", .{tx.gas_limit});
-        std.debug.print("   Gas price: {} wei\n\n", .{tx.gas_price});
+        std.debug.print("   Gas price: {?} wei\n\n", .{tx.gas_price});
     }
 
     // Example 2: Create EIP-1559 transaction
     std.debug.print("Example 2: EIP-1559 Transaction\n", .{});
     std.debug.print("────────────────────────────────\n", .{});
     {
-        var tx = zigeth.types.Transaction.newEip1559(allocator);
+        const to_address = try zigeth.primitives.Address.fromHex("0x8888888888888888888888888888888888888888");
+        const empty_data = try zigeth.primitives.Bytes.fromSlice(allocator, &[_]u8{});
+
+        var tx = zigeth.types.Transaction.newEip1559(
+            allocator,
+            to_address,
+            zigeth.primitives.U256.fromInt(1_000_000_000_000_000), // 0.001 ETH
+            empty_data,
+            1, // nonce
+            21000, // gas_limit
+            zigeth.primitives.U256.fromInt(50_000_000_000), // 50 gwei max_fee
+            zigeth.primitives.U256.fromInt(2_000_000_000), // 2 gwei priority_fee
+            11155111, // chain_id (Sepolia)
+            null, // access_list
+        );
 
         tx.from = from_address;
-        tx.to = try zigeth.primitives.Address.fromHex(
-            
-            "0x8888888888888888888888888888888888888888"
-        );
-        tx.value = zigeth.primitives.U256.fromInt(1_000_000_000_000_000); // 0.001 ETH
-        tx.gas_limit = 21000;
-        tx.max_fee_per_gas = zigeth.primitives.U256.fromInt(50_000_000_000); // 50 gwei
-        tx.max_priority_fee_per_gas = zigeth.primitives.U256.fromInt(2_000_000_000); // 2 gwei
-        tx.nonce = 1;
-        tx.data = &[_]u8{};
 
         std.debug.print("✅ Created EIP-1559 transaction\n", .{});
         std.debug.print("   Type: EIP-1559\n", .{});
-        std.debug.print("   Max fee: {} wei\n", .{tx.max_fee_per_gas});
-        std.debug.print("   Priority fee: {} wei\n\n", .{tx.max_priority_fee_per_gas});
+        std.debug.print("   Max fee: {?} wei\n", .{tx.max_fee_per_gas});
+        std.debug.print("   Priority fee: {?} wei\n\n", .{tx.max_priority_fee_per_gas});
     }
 
     // Example 3: Using Middleware for Automatic Gas & Nonce
@@ -97,40 +102,44 @@ pub fn main() !void {
         const gas_config = zigeth.middleware.GasConfig.fast(); // Fast confirmation
         var gas_middleware = zigeth.middleware.GasMiddleware.init(
             allocator,
-            &provider,
+            provider.getProvider(),
             gas_config,
         );
 
         var nonce_middleware = try zigeth.middleware.NonceMiddleware.init(
             allocator,
-            &provider,
+            provider.getProvider(),
             .hybrid, // Hybrid strategy for reliability
         );
         defer nonce_middleware.deinit();
 
-        // Create transaction
-        var tx = zigeth.types.Transaction.newEip1559(allocator);
-        tx.from = from_address;
-        tx.to = try zigeth.primitives.Address.fromHex(
-            
-            "0x7777777777777777777777777777777777777777"
-        );
-        tx.value = zigeth.primitives.U256.fromInt(1_000_000_000_000_000);
-        tx.data = &[_]u8{};
+        // Create transaction with middleware
+        const to_address = try zigeth.primitives.Address.fromHex("0x7777777777777777777777777777777777777777");
+        const empty_data = try zigeth.primitives.Bytes.fromSlice(allocator, &[_]u8{});
+        const nonce = try nonce_middleware.reserveNonce(from_address);
 
-        // Apply middleware (automatic!)
-        tx.nonce = try nonce_middleware.reserveNonce(from_address);
-        tx.gas_limit = try gas_middleware.estimateGasLimit(
-            from_address,
-            tx.to.?,
-            tx.data,
+        // Create transaction with initial values
+        var tx = zigeth.types.Transaction.newEip1559(
+            allocator,
+            to_address,
+            zigeth.primitives.U256.fromInt(1_000_000_000_000_000), // 0.001 ETH
+            empty_data,
+            nonce,
+            21000, // initial gas_limit (will be estimated)
+            zigeth.primitives.U256.fromInt(50_000_000_000), // temp values
+            zigeth.primitives.U256.fromInt(2_000_000_000),
+            11155111, // Sepolia
+            null,
         );
+        tx.from = from_address;
+
+        // Apply middleware to optimize gas settings
         try gas_middleware.applyGasSettings(&tx);
 
         std.debug.print("✅ Transaction configured with middleware\n", .{});
         std.debug.print("   Nonce: {d} (auto-managed)\n", .{tx.nonce});
-        std.debug.print("   Gas limit: {d} (estimated with 20% buffer)\n", .{tx.gas_limit});
-        std.debug.print("   Max fee: {} (optimized for fast confirmation)\n", .{tx.max_fee_per_gas});
+        std.debug.print("   Gas limit: {d}\n", .{tx.gas_limit});
+        std.debug.print("   Max fee: {?}\n", .{tx.max_fee_per_gas});
 
         // Check if we have sufficient balance
         const has_balance = try gas_middleware.checkSufficientBalance(
@@ -145,18 +154,22 @@ pub fn main() !void {
     std.debug.print("Example 4: Sign Transaction\n", .{});
     std.debug.print("───────────────────────────\n", .{});
     {
-        var tx = zigeth.types.Transaction.newEip1559(allocator);
-        tx.from = from_address;
-        tx.to = try zigeth.primitives.Address.fromHex(
-            
-            "0x6666666666666666666666666666666666666666"
+        const to_address = try zigeth.primitives.Address.fromHex("0x6666666666666666666666666666666666666666");
+        const empty_data = try zigeth.primitives.Bytes.fromSlice(allocator, &[_]u8{});
+
+        var tx = zigeth.types.Transaction.newEip1559(
+            allocator,
+            to_address,
+            zigeth.primitives.U256.fromInt(1_000_000_000_000_000), // 0.001 ETH
+            empty_data,
+            0, // nonce
+            21000, // gas_limit
+            zigeth.primitives.U256.fromInt(50_000_000_000), // 50 gwei max_fee
+            zigeth.primitives.U256.fromInt(2_000_000_000), // 2 gwei priority_fee
+            11155111, // Sepolia
+            null, // access_list
         );
-        tx.value = zigeth.primitives.U256.fromInt(1_000_000_000_000_000);
-        tx.nonce = 0;
-        tx.gas_limit = 21000;
-        tx.max_fee_per_gas = zigeth.primitives.U256.fromInt(50_000_000_000);
-        tx.max_priority_fee_per_gas = zigeth.primitives.U256.fromInt(2_000_000_000);
-        tx.data = &[_]u8{};
+        tx.from = from_address;
 
         // Sign the transaction
         const signature = try signer_middleware.signTransaction(&tx);
@@ -205,4 +218,3 @@ pub fn main() !void {
     std.debug.print("🎉 All transaction examples completed!\n", .{});
     std.debug.print("💡 Tip: Use Sepolia testnet for actual testing\n\n", .{});
 }
-
