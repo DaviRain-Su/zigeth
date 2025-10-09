@@ -57,7 +57,27 @@ pub const providers = struct {
     pub const HttpProvider = @import("providers/http.zig").HttpProvider;
 };
 
-pub const rpc = @import("rpc/client.zig");
+pub const rpc = struct {
+    pub const client = @import("rpc/client.zig");
+    pub const rpc_types = @import("rpc/types.zig");
+    pub const eth = @import("rpc/eth.zig");
+    pub const net = @import("rpc/net.zig");
+    pub const web3 = @import("rpc/web3.zig");
+    pub const debug = @import("rpc/debug.zig");
+
+    // Re-export commonly used types
+    pub const RpcClient = client.RpcClient;
+    pub const HttpTransport = client.HttpTransport;
+    pub const EthNamespace = eth.EthNamespace;
+    pub const NetNamespace = net.NetNamespace;
+    pub const Web3Namespace = web3.Web3Namespace;
+    pub const DebugNamespace = debug.DebugNamespace;
+    pub const BlockParameter = rpc_types.BlockParameter;
+    pub const CallParams = rpc_types.CallParams;
+    pub const TransactionParams = rpc_types.TransactionParams;
+    pub const FilterOptions = rpc_types.FilterOptions;
+};
+
 pub const contract = @import("contract/contract.zig");
 pub const signer = @import("signer/wallet.zig");
 
