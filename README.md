@@ -23,16 +23,16 @@ A comprehensive Ethereum library for Zig, providing complete cryptographic primi
 | **🔑 Wallet** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Software wallet, Keystore |
 | **⚙️ Middleware** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Gas, Nonce, Signing |
 | **🌍 Networks** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Pre-configured networks |
-| **🧰 Utils** | 🚧 **Partial** | ████░░░░░░░░░░░░░░░░ 20% | 8/8 | Hex, Format, Units, Checksum |
+| **🧰 Utils** | ✅ **Production Ready** | ████████████████████ 100% | 35/35 | Hex, Format, Units, Checksum (EIP-55/1191) |
 
 ### Overall Progress
-**Total**: 150/150 tests passing ✅ | **50% Complete** | **5/12 modules production-ready**
+**Total**: 177/177 tests passing ✅ | **55% Complete** | **6/12 modules production-ready**
 
 **Legend**: ✅ Production Ready | 🚧 In Progress | ⏳ Planned
 
 ---
 
-**Current Status**: 150 tests passing | 50% complete | Production-ready crypto, ABI, primitives & contract interaction
+**Current Status**: 177 tests passing | 55% complete | Production-ready crypto, ABI, primitives, contracts & utilities
 
 ## 🏗️ Architecture
 
@@ -114,11 +114,11 @@ zigeth/
 │   │   ├── types.zig         # Solidity type mappings
 │   │   └── macros.zig        # Code generation macros
 │   │
-│   └── utils/                # Utility functions (PARTIAL)
+│   └── utils/                # Utility functions ✅ IMPLEMENTED
 │       ├── hex.zig           # Hex encoding/decoding ✅
-│       ├── format.zig        # Formatting utilities (TODO)
-│       ├── units.zig         # Unit conversions (TODO)
-│       └── checksum.zig      # EIP-55 checksummed addresses (TODO)
+│       ├── format.zig        # Formatting utilities ✅
+│       ├── units.zig         # Unit conversions (wei/gwei/ether) ✅
+│       └── checksum.zig      # EIP-55/EIP-1191 checksummed addresses ✅
 │
 ├── build.zig                 # Build configuration
 └── build.zig.zon             # Package manifest
@@ -178,8 +178,15 @@ zigeth/
   - View/pure call execution
   - State-changing transaction handling
 
-- **🧰 Utilities**:
+- **🧰 Utilities** (4 modules, 35 tests):
   - Hex encoding/decoding with 0x prefix support
+  - Formatting (address/hash short forms, byte formatting, U256 formatting)
+  - Unit conversions (wei/gwei/ether and all denominations)
+  - EIP-55 checksummed addresses
+  - EIP-1191 checksummed addresses (chain-specific)
+  - Gas price conversions
+  - Number formatting with separators
+  - String padding and truncation
   - Memory-safe allocations
   - Comprehensive error handling
 
@@ -846,13 +853,181 @@ const event_sig = try zigeth.contract.getEventSignatureHash(allocator, event);
 filter.setEventSignature(event_sig);
 ```
 
+## 🧰 Utilities
+
+Zigeth provides comprehensive utility functions for common Ethereum operations.
+
+### Unit Conversions
+
+Convert between wei, gwei, and ether:
+
+```zig
+const zigeth = @import("zigeth");
+const units = zigeth.utils.units;
+
+// Convert to wei
+const wei_from_ether = units.toWei(1, .ether); // 1 ETH = 1e18 wei
+const wei_from_gwei = units.toWei(30, .gwei);   // 30 gwei = 30e9 wei
+
+// Convert from wei
+const wei = zigeth.primitives.U256.fromInt(1_500_000_000_000_000_000);
+const conversion = try units.fromWei(wei, .ether);
+// conversion.integer_part = 1
+// conversion.remainder_wei = 0.5 ETH in wei
+
+// Format with decimals
+const formatted = try conversion.format(allocator, 4);
+defer allocator.free(formatted);
+// Result: "1.5000"
+
+// Floating point conversions
+const wei2 = try units.etherToWei(2.5);  // 2.5 ETH to wei
+const ether = try units.weiToEther(wei); // wei to ether (f64)
+
+// Gas price helpers
+const gas_wei = units.GasPrice.gweiToWei(30); // 30 gwei to wei
+const gas_gwei = try units.GasPrice.weiToGwei(gas_wei); // back to gwei
+```
+
+Supported units:
+- `wei` (1)
+- `kwei` (1e3)
+- `mwei` (1e6)
+- `gwei` (1e9) - commonly used for gas prices
+- `szabo` (1e12)
+- `finney` (1e15)
+- `ether` (1e18)
+- `kether` (1e21)
+- `mether` (1e24)
+- `gether` (1e27)
+- `tether` (1e30)
+
+### Formatting
+
+Format addresses, hashes, and numbers for display:
+
+```zig
+const zigeth = @import("zigeth");
+const format = zigeth.utils.format;
+
+// Shorten addresses for display
+const addr = try zigeth.primitives.Address.fromHex("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb");
+const short = try format.formatAddressShort(allocator, addr);
+defer allocator.free(short);
+// Result: "0x742d...0bEb"
+
+// Shorten hashes
+const hash = zigeth.primitives.Hash.fromBytes([_]u8{0xab} ** 32);
+const short_hash = try format.formatHashShort(allocator, hash);
+defer allocator.free(short_hash);
+// Result: "0xabab...abab"
+
+// Format bytes with length limit
+const data = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05 };
+const formatted_bytes = try format.formatBytes(allocator, &data, 10);
+defer allocator.free(formatted_bytes);
+
+// Format U256 as decimal
+const value = zigeth.primitives.U256.fromInt(1234567890);
+const decimal = try format.formatU256(allocator, value);
+defer allocator.free(decimal);
+// Result: "1234567890"
+
+// Format U256 as hex
+const hex = try format.formatU256Hex(allocator, value);
+defer allocator.free(hex);
+// Result: "0x499602d2"
+
+// Add thousand separators
+const with_sep = try format.formatWithSeparators(allocator, "1234567890", ',');
+defer allocator.free(with_sep);
+// Result: "1,234,567,890"
+
+// Pad strings
+const padded = try format.padLeft(allocator, "42", 10, '0');
+defer allocator.free(padded);
+// Result: "0000000042"
+
+const padded2 = try format.padRight(allocator, "42", 10, '0');
+defer allocator.free(padded2);
+// Result: "4200000000"
+
+// Truncate strings
+const truncated = try format.truncate(allocator, "Hello, World!", 5);
+defer allocator.free(truncated);
+// Result: "Hello"
+```
+
+### Checksummed Addresses
+
+EIP-55 and EIP-1191 checksummed addresses:
+
+```zig
+const zigeth = @import("zigeth");
+const checksum = zigeth.utils.checksum;
+
+// EIP-55 checksum (standard Ethereum)
+const addr = try zigeth.primitives.Address.fromHex("0x5aaeb6053f3e94c9b9a09f33669a657bb6e41057");
+const checksummed = try checksum.toChecksumAddress(allocator, addr);
+defer allocator.free(checksummed);
+// Result: "0x5aAeB6053F3E94C9b9A09f33669A657bB6e41057" (mixed case)
+
+// Verify checksum
+const is_valid = try checksum.verifyChecksum(allocator, checksummed);
+// Result: true
+
+// EIP-1191 checksum (chain-specific)
+const checksummed_eip1191 = try checksum.toChecksumAddressEip1191(allocator, addr, 1); // mainnet
+defer allocator.free(checksummed_eip1191);
+
+const is_valid_1191 = try checksum.verifyChecksumEip1191(allocator, checksummed_eip1191, 1);
+// Result: true
+
+// Normalize address (lowercase)
+const normalized = try checksum.normalizeAddress(allocator, "0x5aAeB6053F3E94C9b9A09f33669A657bB6e41057");
+defer allocator.free(normalized);
+// Result: "0x5aaeb6053f3e94c9b9a09f33669a657bb6e41057"
+
+// Compare addresses (case-insensitive)
+const equal = try checksum.addressesEqual(
+    "0x5aaeb6053f3e94c9b9a09f33669a657bb6e41057",
+    "0x5AAEB6053F3E94C9B9A09F33669A657BB6E41057",
+);
+// Result: true
+```
+
+### Hex Utilities
+
+Already covered in primitives, but available as standalone utilities:
+
+```zig
+const zigeth = @import("zigeth");
+const hex = zigeth.utils.hex;
+
+// Bytes to hex
+const bytes = [_]u8{ 0xde, 0xad, 0xbe, 0xef };
+const hex_str = try hex.bytesToHex(allocator, &bytes);
+defer allocator.free(hex_str);
+// Result: "0xdeadbeef"
+
+// Hex to bytes
+const bytes2 = try hex.hexToBytes(allocator, "0xdeadbeef");
+defer allocator.free(bytes2);
+
+// Validate hex
+const is_valid = hex.isValidHex("0xdeadbeef"); // true
+const is_invalid = hex.isValidHex("0xgg"); // false
+```
+
 ## 🔧 EIP Support
 
 Zigeth implements the latest Ethereum Improvement Proposals:
 
 | EIP | Description | Status |
 |-----|-------------|--------|
+| **EIP-55** | Mixed-case checksum address encoding | ✅ Implemented |
 | **EIP-155** | Simple replay attack protection | ✅ Implemented |
+| **EIP-1191** | Checksummed addresses for different chains | ✅ Implemented |
 | **EIP-1559** | Fee market change (base fee + priority fee) | ✅ Implemented |
 | **EIP-2718** | Typed transaction envelope | ✅ Implemented |
 | **EIP-2930** | Optional access lists | ✅ Implemented |
@@ -882,14 +1057,14 @@ All Ethereum transaction types are fully supported:
 
 ## 📊 Testing & Quality
 
-- **Total Tests**: 150 passing ✓
+- **Total Tests**: 177 passing ✓
   - Primitives: 48 tests
   - Types: 23 tests
   - Crypto: 27 tests
   - RPC: 13 tests
   - ABI: 23 tests
   - Contract: 19 tests
-  - Utilities: 8 tests
+  - Utilities: 35 tests
 - **Code Coverage**: Comprehensive
 - **Linting**: Enforced via `zig build lint`
 - **Formatting**: Auto-formatted with `zig fmt`
