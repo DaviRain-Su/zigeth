@@ -18,7 +18,7 @@ A comprehensive Ethereum library for Zig, providing complete cryptographic primi
 | **📡 ABI** | ✅ **Production Ready** | ████████████████████ 100% | 23/23 | Encoding, Decoding, Types, Packed (EIP-712) |
 | **📝 Contract** | ✅ **Production Ready** | ████████████████████ 100% | 19/19 | Calls, Deploy, Events, CREATE2 |
 | **🌐 RPC** | 🚧 **Framework Only** | ████████░░░░░░░░░░░░ 40% | 13/13 | Client, eth/net/web3/debug namespaces |
-| **📜 RLP** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Encoding, Decoding |
+| **📜 RLP** | ✅ **Production Ready** | ████████████████████ 100% | 36/36 | Encoding, Decoding, Ethereum types |
 | **🔌 Providers** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | HTTP, WebSocket, IPC |
 | **🔑 Wallet** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Software wallet, Keystore |
 | **⚙️ Middleware** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Gas, Nonce, Signing |
@@ -26,13 +26,13 @@ A comprehensive Ethereum library for Zig, providing complete cryptographic primi
 | **🧰 Utils** | ✅ **Production Ready** | ████████████████████ 100% | 35/35 | Hex, Format, Units, Checksum (EIP-55/1191) |
 
 ### Overall Progress
-**Total**: 177/177 tests passing ✅ | **55% Complete** | **6/12 modules production-ready**
+**Total**: 213/213 tests passing ✅ | **60% Complete** | **7/12 modules production-ready**
 
 **Legend**: ✅ Production Ready | 🚧 In Progress | ⏳ Planned
 
 ---
 
-**Current Status**: 177 tests passing | 55% complete | Production-ready crypto, ABI, primitives, contracts & utilities
+**Current Status**: 213 tests passing | 60% complete | Production-ready crypto, ABI, primitives, contracts, RLP & utilities
 
 ## 🏗️ Architecture
 
@@ -69,10 +69,10 @@ zigeth/
 │   │   ├── types.zig         # ABI type definitions ✅
 │   │   └── packed.zig        # Packed encoding (EIP-712) ✅
 │   │
-│   ├── rlp/                  # Recursive Length Prefix (TODO)
-│   │   ├── encode.zig        # RLP encoding
-│   │   ├── decode.zig        # RLP decoding
-│   │   └── packed.zig        # Packed RLP encoding
+│   ├── rlp/                  # Recursive Length Prefix ✅ IMPLEMENTED
+│   │   ├── encode.zig        # RLP encoding ✅
+│   │   ├── decode.zig        # RLP decoding ✅
+│   │   └── packed.zig        # Ethereum-specific encoding ✅
 │   │
 │   ├── rpc/                  # JSON-RPC client ✅ FRAMEWORK
 │   │   ├── client.zig        # RPC client core ✅
@@ -190,9 +190,21 @@ zigeth/
   - Memory-safe allocations
   - Comprehensive error handling
 
+- **📜 RLP Encoding/Decoding** (3 modules, 36 tests):
+  - Complete RLP specification implementation
+  - Single byte encoding (< 0x80)
+  - Short string encoding (0-55 bytes)
+  - Long string encoding (> 55 bytes)
+  - Short list encoding (0-55 bytes payload)
+  - Long list encoding (> 55 bytes payload)
+  - Nested list support
+  - Ethereum-specific encoders (Address, Hash, U256)
+  - Transaction encoding helpers
+  - Full decode support with type-safe values
+  - Roundtrip encoding/decoding verification
+
 ### 🚧 **Planned Features**
 
-- **📜 RLP Encoding**: Recursive Length Prefix for transaction encoding
 - **🌐 Providers**: HTTP, WebSocket, IPC provider implementations with JSON-RPC
 - **🔑 Wallet Management**: Software wallets, keystore, and hardware wallet support
 - **⚙️ Middleware**: Gas estimation, nonce management, and transaction signing
@@ -1019,6 +1031,173 @@ const is_valid = hex.isValidHex("0xdeadbeef"); // true
 const is_invalid = hex.isValidHex("0xgg"); // false
 ```
 
+## 📜 RLP Encoding/Decoding
+
+Zigeth provides a complete implementation of Ethereum's Recursive Length Prefix (RLP) encoding scheme.
+
+### Basic RLP Encoding
+
+```zig
+const zigeth = @import("zigeth");
+const rlp = zigeth.rlp;
+
+// Encode bytes/string
+const encoded_str = try rlp.encodeBytes(allocator, "dog");
+defer allocator.free(encoded_str);
+// Result: [0x83, 'd', 'o', 'g']
+
+// Encode uint
+const encoded_num = try rlp.encodeUint(allocator, 127);
+defer allocator.free(encoded_num);
+// Result: [0x7f] (single byte < 0x80)
+
+// Encode empty string
+const empty = try rlp.encodeBytes(allocator, &[_]u8{});
+defer allocator.free(empty);
+// Result: [0x80]
+
+// Encode list of items
+const items = [_]rlp.RlpItem{
+    .{ .string = "cat" },
+    .{ .string = "dog" },
+};
+const encoded_list = try rlp.encodeList(allocator, &items);
+defer allocator.free(encoded_list);
+// Result: [0xc8, 0x83, 'c', 'a', 't', 0x83, 'd', 'o', 'g']
+```
+
+### Using the Encoder Builder
+
+```zig
+// Build complex structures
+var encoder = rlp.Encoder.init(allocator);
+defer encoder.deinit();
+
+// Add items
+try encoder.encode(.{ .string = "hello" });
+try encoder.encode(.{ .uint = 42 });
+
+// Nested list
+const nested = [_]rlp.RlpItem{
+    .{ .string = "a" },
+    .{ .string = "b" },
+};
+try encoder.encode(.{ .list = &nested });
+
+// Get result
+const result = try encoder.toOwnedSlice();
+defer allocator.free(result);
+```
+
+### RLP Decoding
+
+```zig
+// Decode single value
+const data = [_]u8{ 0x83, 'd', 'o', 'g' };
+const value = try rlp.decodeValue(allocator, &data);
+defer value.deinit(allocator);
+
+if (value.isBytes()) {
+    const bytes = try value.getBytes();
+    // bytes = "dog"
+}
+
+// Decode list
+const list_data = [_]u8{ 0xc8, 0x83, 'c', 'a', 't', 0x83, 'd', 'o', 'g' };
+const list_value = try rlp.decodeValue(allocator, &list_data);
+defer list_value.deinit(allocator);
+
+if (list_value.isList()) {
+    const items = try list_value.getList();
+    for (items) |item| {
+        const str = try item.getBytes();
+        std.debug.print("Item: {s}\n", .{str});
+    }
+}
+
+// Use decoder for multiple values
+var decoder = rlp.Decoder.init(allocator, data);
+
+while (decoder.hasMore()) {
+    const item = try decoder.decode();
+    defer item.deinit(allocator);
+    // Process item...
+}
+```
+
+### Ethereum-Specific Encoding
+
+```zig
+// Encode Address
+const addr = try zigeth.primitives.Address.fromHex("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb");
+const encoded_addr = try rlp.EthereumEncoder.encodeAddress(allocator, addr);
+defer allocator.free(encoded_addr);
+
+// Encode Hash
+const hash = zigeth.primitives.Hash.fromBytes([_]u8{0xab} ** 32);
+const encoded_hash = try rlp.EthereumEncoder.encodeHash(allocator, hash);
+defer allocator.free(encoded_hash);
+
+// Encode U256
+const value = zigeth.primitives.U256.fromInt(1000000);
+const encoded_value = try rlp.EthereumEncoder.encodeU256(allocator, value);
+defer allocator.free(encoded_value);
+
+// Encode address list
+const addresses = [_]zigeth.primitives.Address{
+    addr1,
+    addr2,
+    addr3,
+};
+const encoded_addrs = try rlp.EthereumEncoder.encodeAddressList(allocator, &addresses);
+defer allocator.free(encoded_addrs);
+```
+
+### Ethereum-Specific Decoding
+
+```zig
+// Decode Address (from RLP bytes payload)
+const addr_data = ...; // 20 bytes from RLP
+const addr = try rlp.EthereumDecoder.decodeAddress(addr_data);
+
+// Decode Hash (from RLP bytes payload)
+const hash_data = ...; // 32 bytes from RLP
+const hash = try rlp.EthereumDecoder.decodeHash(hash_data);
+
+// Decode U256 (from RLP bytes payload)
+const uint_data = ...; // Variable length bytes from RLP
+const value = try rlp.EthereumDecoder.decodeU256(uint_data);
+```
+
+### Transaction Encoding (Legacy)
+
+```zig
+// Encode legacy transaction for signing
+const tx = ...; // Your transaction
+const encoded_for_signing = try rlp.TransactionEncoder.encodeLegacyForSigning(
+    allocator,
+    tx,
+);
+defer allocator.free(encoded_for_signing);
+
+// After signing, encode with signature
+const encoded_signed = try rlp.TransactionEncoder.encodeLegacySigned(
+    allocator,
+    tx,
+);
+defer allocator.free(encoded_signed);
+```
+
+### RLP Specification
+
+The RLP encoding follows the Ethereum Yellow Paper specification:
+
+1. **Single byte** (< 0x80): Encoded as itself
+2. **String 0-55 bytes**: `[0x80 + length, ...bytes]`
+3. **String > 55 bytes**: `[0xb7 + length_of_length, ...length_bytes, ...bytes]`
+4. **List 0-55 bytes payload**: `[0xc0 + payload_length, ...encoded_items]`
+5. **List > 55 bytes payload**: `[0xf7 + length_of_length, ...length_bytes, ...encoded_items]`
+
 ## 🔧 EIP Support
 
 Zigeth implements the latest Ethereum Improvement Proposals:
@@ -1057,13 +1236,14 @@ All Ethereum transaction types are fully supported:
 
 ## 📊 Testing & Quality
 
-- **Total Tests**: 177 passing ✓
+- **Total Tests**: 213 passing ✓
   - Primitives: 48 tests
   - Types: 23 tests
   - Crypto: 27 tests
   - RPC: 13 tests
   - ABI: 23 tests
   - Contract: 19 tests
+  - RLP: 36 tests
   - Utilities: 35 tests
 - **Code Coverage**: Comprehensive
 - **Linting**: Enforced via `zig build lint`

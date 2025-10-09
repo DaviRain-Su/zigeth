@@ -67,6 +67,24 @@ pub const abi = struct {
 pub const rlp = struct {
     pub const encode = @import("rlp/encode.zig");
     pub const decode = @import("rlp/decode.zig");
+    pub const ethereum = @import("rlp/packed.zig");
+
+    // Re-export commonly used types
+    pub const Encoder = encode.Encoder;
+    pub const Decoder = decode.Decoder;
+    pub const RlpItem = encode.RlpItem;
+    pub const RlpValue = decode.RlpValue;
+    pub const encodeItem = encode.encodeItem;
+    pub const encodeList = encode.encodeList;
+    pub const encodeBytes = encode.encodeBytes;
+    pub const encodeUint = encode.encodeUint;
+    pub const decodeValue = decode.decode;
+    pub const decodeBytes = decode.decodeBytes;
+    pub const decodeList = decode.decodeList;
+    pub const decodeUint = decode.decodeUint;
+    pub const TransactionEncoder = ethereum.TransactionEncoder;
+    pub const EthereumEncoder = ethereum.EthereumEncoder;
+    pub const EthereumDecoder = ethereum.EthereumDecoder;
 };
 
 pub const providers = struct {
