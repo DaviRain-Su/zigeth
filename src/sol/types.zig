@@ -54,7 +54,7 @@ pub const SolidityType = enum {
             .bytes4 => .{ .fixed_bytes = 4 },
             .bytes8 => .{ .fixed_bytes = 8 },
             .bytes16 => .{ .fixed_bytes = 16 },
-            .bytes32 => .{ .fixed_bytes = 32 },
+            .bytes32 => .bytes32,
         };
     }
 
@@ -585,7 +585,7 @@ fn getAccessControlFunctions(allocator: std.mem.Allocator) ![]abi.Function {
         .{
             .name = "hasRole",
             .inputs = &[_]abi.Parameter{
-                .{ .name = "role", .type = .{ .fixed_bytes = 32 } },
+                .{ .name = "role", .type = .bytes32 },
                 .{ .name = "account", .type = .address },
             },
             .outputs = &[_]abi.Parameter{
@@ -596,7 +596,7 @@ fn getAccessControlFunctions(allocator: std.mem.Allocator) ![]abi.Function {
         .{
             .name = "grantRole",
             .inputs = &[_]abi.Parameter{
-                .{ .name = "role", .type = .{ .fixed_bytes = 32 } },
+                .{ .name = "role", .type = .bytes32 },
                 .{ .name = "account", .type = .address },
             },
             .outputs = &[_]abi.Parameter{},
@@ -605,7 +605,7 @@ fn getAccessControlFunctions(allocator: std.mem.Allocator) ![]abi.Function {
         .{
             .name = "revokeRole",
             .inputs = &[_]abi.Parameter{
-                .{ .name = "role", .type = .{ .fixed_bytes = 32 } },
+                .{ .name = "role", .type = .bytes32 },
                 .{ .name = "account", .type = .address },
             },
             .outputs = &[_]abi.Parameter{},
@@ -622,7 +622,7 @@ fn getAccessControlEvents(allocator: std.mem.Allocator) ![]abi.Event {
         .{
             .name = "RoleGranted",
             .inputs = &[_]abi.Parameter{
-                .{ .name = "role", .type = .{ .fixed_bytes = 32 }, .indexed = true },
+                .{ .name = "role", .type = .bytes32, .indexed = true },
                 .{ .name = "account", .type = .address, .indexed = true },
                 .{ .name = "sender", .type = .address, .indexed = true },
             },
@@ -630,7 +630,7 @@ fn getAccessControlEvents(allocator: std.mem.Allocator) ![]abi.Event {
         .{
             .name = "RoleRevoked",
             .inputs = &[_]abi.Parameter{
-                .{ .name = "role", .type = .{ .fixed_bytes = 32 }, .indexed = true },
+                .{ .name = "role", .type = .bytes32, .indexed = true },
                 .{ .name = "account", .type = .address, .indexed = true },
                 .{ .name = "sender", .type = .address, .indexed = true },
             },

@@ -142,7 +142,7 @@ pub fn generateDeterministicK(
 }
 
 test "signer creation" {
-    var prng = std.rand.DefaultPrng.init(0);
+    var prng = std.Random.DefaultPrng.init(0);
     const random = prng.random();
 
     const pk = try secp256k1.PrivateKey.generate(random);
@@ -153,7 +153,7 @@ test "signer creation" {
 }
 
 test "transaction signer with chain id" {
-    var prng = std.rand.DefaultPrng.init(0);
+    var prng = std.Random.DefaultPrng.init(0);
     const random = prng.random();
 
     const pk = try secp256k1.PrivateKey.generate(random);

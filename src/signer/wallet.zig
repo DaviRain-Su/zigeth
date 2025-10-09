@@ -21,7 +21,7 @@ pub const Wallet = struct {
 
     /// Create a new wallet from a private key
     pub fn init(allocator: std.mem.Allocator, private_key: PrivateKey) !Wallet {
-        const signer = try Signer.init(allocator, private_key);
+        const signer = Signer.init(private_key);
         const address = try signer.getAddress();
 
         return .{
@@ -63,7 +63,9 @@ pub const Wallet = struct {
 
     /// Generate a new random wallet
     pub fn generate(allocator: std.mem.Allocator) !Wallet {
-        const private_key = try PrivateKey.generate();
+        var prng = std.Random.DefaultPrng.init(@intCast(std.time.timestamp()));
+        const random = prng.random();
+        const private_key = try PrivateKey.generate(random);
         return try init(allocator, private_key);
     }
 
@@ -85,11 +87,7 @@ pub const Wallet = struct {
     /// Export private key as hex string
     pub fn exportPrivateKey(self: Wallet) ![]u8 {
         const hex_module = @import("../utils/hex.zig");
-        const key_u256 = try self.private_key.toU256();
-        const key_bytes = try key_u256.toBytes(self.allocator);
-        defer self.allocator.free(key_bytes);
-
-        const hex = try hex_module.bytesToHex(self.allocator, key_bytes);
+        const hex = try hex_module.bytesToHex(self.allocator, &self.private_key.bytes);
         return hex;
     }
 
@@ -217,7 +215,7 @@ pub const Wallet = struct {
 
     /// Sign a message (with Ethereum prefix)
     pub fn signMessage(self: *Wallet, message: []const u8) !Signature {
-        return try self.signer.signPersonalMessage(message);
+        return try self.signer.signPersonalMessage(self.allocator, message);
     }
 
     /// Sign typed data (EIP-712)
@@ -353,7 +351,7 @@ pub const Mnemonic = struct {
 
         // Derive 64-byte seed using PBKDF2-HMAC-SHA512
         var seed: [64]u8 = undefined;
-        std.crypto.pwhash.pbkdf2(
+        try std.crypto.pwhash.pbkdf2(
             &seed,
             phrase,
             salt.items,

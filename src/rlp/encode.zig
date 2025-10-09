@@ -36,7 +36,7 @@ pub const Encoder = struct {
     }
 
     /// Encode an RLP item
-    pub fn encode(self: *Encoder, item: RlpItem) !void {
+    pub fn encode(self: *Encoder, item: RlpItem) std.mem.Allocator.Error!void {
         switch (item) {
             .bytes => |b| try self.encodeBytes(b),
             .string => |s| try self.encodeBytes(s),

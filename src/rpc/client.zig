@@ -140,23 +140,29 @@ pub const HttpTransport = struct {
         var client = std.http.Client{ .allocator = self.allocator };
         defer client.deinit();
 
+        // Build extra headers array
+        var extra_headers_list = std.ArrayList(std.http.Header).init(self.allocator);
+        defer extra_headers_list.deinit();
+
+        var it = self.headers.iterator();
+        while (it.next()) |entry| {
+            try extra_headers_list.append(.{
+                .name = entry.key_ptr.*,
+                .value = entry.value_ptr.*,
+            });
+        }
+
         // Prepare headers
         var header_buffer: [4096]u8 = undefined;
         var req = try client.open(.POST, uri, .{
             .server_header_buffer = &header_buffer,
+            .extra_headers = extra_headers_list.items,
         });
         defer req.deinit();
 
-        // Set headers
+        // Set transfer encoding
         req.transfer_encoding = .chunked;
 
-        // Add custom headers
-        var it = self.headers.iterator();
-        while (it.next()) |entry| {
-            try req.headers.append(entry.key_ptr.*, entry.value_ptr.*);
-        }
-
-        // Send request
         try req.send();
 
         // Write body

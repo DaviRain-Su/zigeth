@@ -69,8 +69,7 @@ pub const FeeData = struct {
     last_block_number: u64,
 
     pub fn estimatedCost(self: FeeData, gas_limit: u64) U256 {
-        const gas_u256 = U256.fromInt(gas_limit);
-        return self.max_fee_per_gas.mulScalar(gas_u256.toU64() catch gas_limit);
+        return self.max_fee_per_gas.mulScalar(gas_limit);
     }
 };
 
@@ -102,7 +101,7 @@ pub const GasMiddleware = struct {
         // Apply multiplier
         const multiplier_int = @as(u64, @intFromFloat(self.config.multiplier * 100.0));
         const adjusted_price = base_price.mulScalar(multiplier_int);
-        return adjusted_price.divScalar(100);
+        return adjusted_price.divScalar(100).quotient;
     }
 
     /// Get EIP-1559 fee data
@@ -122,7 +121,7 @@ pub const GasMiddleware = struct {
                     const fee_data = FeeData{
                         .max_fee_per_gas = max_fee,
                         .max_priority_fee_per_gas = max_priority,
-                        .base_fee_per_gas = max_fee.sub(max_priority) catch U256.zero(),
+                        .base_fee_per_gas = if (max_fee.gte(max_priority)) max_fee.sub(max_priority) else U256.zero(),
                         .last_block_number = try self.provider.getBlockNumber(),
                     };
                     self.cached_fee_data = fee_data;
@@ -147,7 +146,7 @@ pub const GasMiddleware = struct {
         const priority_fee = try self.calculatePriorityFee(base_fee);
 
         // Calculate max fee = base fee + priority fee
-        const max_fee = try base_fee.add(priority_fee);
+        const max_fee = base_fee.add(priority_fee);
 
         const fee_data = FeeData{
             .max_fee_per_gas = max_fee,
@@ -176,7 +175,7 @@ pub const GasMiddleware = struct {
         // Apply strategy multiplier
         const multiplier_int = @as(u64, @intFromFloat(self.config.multiplier * 100.0));
         const adjusted = suggested_priority.mulScalar(multiplier_int);
-        return adjusted.divScalar(100);
+        return adjusted.divScalar(100).quotient;
     }
 
     /// Estimate gas limit for a transaction
@@ -211,7 +210,7 @@ pub const GasMiddleware = struct {
     pub fn applyGasSettings(self: *GasMiddleware, tx: *Transaction) !void {
         const fee_data = try self.getFeeData();
 
-        switch (tx.transaction_type) {
+        switch (tx.type) {
             .eip1559, .eip4844, .eip7702 => {
                 // EIP-1559 transactions
                 tx.max_fee_per_gas = fee_data.max_fee_per_gas;
@@ -239,7 +238,7 @@ pub const GasMiddleware = struct {
     ) !bool {
         const balance = try self.provider.getBalance(from);
         const tx_cost = try self.calculateTxCost(gas_limit);
-        const total_cost = try value.add(tx_cost);
+        const total_cost = value.add(tx_cost);
 
         return balance.gte(total_cost);
     }

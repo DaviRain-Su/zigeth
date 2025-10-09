@@ -557,12 +557,15 @@ pub const EthNamespace = struct {
 /// Convert BlockParameter to string for RPC
 fn blockParameterToString(allocator: std.mem.Allocator, block: types.BlockParameter) ![]u8 {
     return switch (block) {
-        .latest => try allocator.dupe(u8, "latest"),
-        .earliest => try allocator.dupe(u8, "earliest"),
-        .pending => try allocator.dupe(u8, "pending"),
-        .safe => try allocator.dupe(u8, "safe"),
-        .finalized => try allocator.dupe(u8, "finalized"),
+        .tag => |tag| switch (tag) {
+            .latest => try allocator.dupe(u8, "latest"),
+            .earliest => try allocator.dupe(u8, "earliest"),
+            .pending => try allocator.dupe(u8, "pending"),
+            .safe => try allocator.dupe(u8, "safe"),
+            .finalized => try allocator.dupe(u8, "finalized"),
+        },
         .number => |num| try std.fmt.allocPrint(allocator, "0x{x}", .{num}),
+        .hash => |hash_value| try std.fmt.allocPrint(allocator, "0x{s}", .{try hash_value.toHex(allocator)}),
     };
 }
 
@@ -925,7 +928,7 @@ fn parseTransactionFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMa
             const r = try U256.fromHex(r_val.?.string);
             const s = try U256.fromHex(s_val.?.string);
 
-            tx.signature = Signature.init(r, s, @intCast(v));
+            tx.signature = Signature.init(r.toBytes(), s.toBytes(), @intCast(v));
         }
     }
 
@@ -1228,17 +1231,13 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
     const uncles_json = obj.get("uncles") orelse return error.MissingField;
     if (uncles_json != .array) return error.InvalidFieldType;
 
-    // For now, create empty uncles array (full uncle parsing would require more work)
-    const uncles = [_]BlockHeader{};
-
     return Block{
         .hash = hash,
         .header = header,
         .transactions = try transactions.toOwnedSlice(),
-        .uncles = try allocator.dupe(BlockHeader, &uncles),
-        .withdrawals = null, // TODO: Parse withdrawals if present
-        .blob_gas_used = blob_gas_used,
-        .excess_blob_gas = excess_blob_gas,
+        .uncles = &[_]Hash{}, // TODO: Parse uncles from JSON
+        .total_difficulty = U256.fromInt(0), // TODO: Parse total difficulty
+        .size = 0, // TODO: Parse size from JSON
         .allocator = allocator,
     };
 }

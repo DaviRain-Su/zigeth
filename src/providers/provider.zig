@@ -58,17 +58,17 @@ pub const Provider = struct {
 
     /// Get account balance
     pub fn getBalance(self: Provider, address: Address) !U256 {
-        return try self.eth.getBalance(address, .latest);
+        return try self.eth.getBalance(address, .{ .tag = .latest });
     }
 
     /// Get transaction count (nonce)
     pub fn getTransactionCount(self: Provider, address: Address) !u64 {
-        return try self.eth.getTransactionCount(address, .latest);
+        return try self.eth.getTransactionCount(address, .{ .tag = .latest });
     }
 
     /// Get contract code
     pub fn getCode(self: Provider, address: Address) ![]u8 {
-        return try self.eth.getCode(address, .latest);
+        return try self.eth.getCode(address, .{ .tag = .latest });
     }
 
     /// Get chain ID
@@ -88,7 +88,7 @@ pub const Provider = struct {
 
     /// Get latest block
     pub fn getLatestBlock(self: Provider) !Block {
-        return try self.eth.getBlockByNumber(.latest, false);
+        return try self.eth.getBlockByNumber(.{ .tag = .latest }, false);
     }
 
     /// Get block by number

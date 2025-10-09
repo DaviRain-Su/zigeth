@@ -103,15 +103,18 @@ pub const CipherParams = struct {
 };
 
 /// Keystore crypto section
+/// KDF parameters union
+pub const KdfParams = union(enum) {
+    scrypt: ScryptParams,
+    pbkdf2: Pbkdf2Params,
+};
+
 pub const KeystoreCrypto = struct {
     cipher: CipherType,
     cipherparams: CipherParams,
     ciphertext: []u8,
     kdf: KdfType,
-    kdfparams: union(enum) {
-        scrypt: ScryptParams,
-        pbkdf2: Pbkdf2Params,
-    },
+    kdfparams: KdfParams,
     mac: [32]u8,
 };
 
@@ -138,14 +141,12 @@ pub const Keystore = struct {
         var iv: [16]u8 = undefined;
         var id: [16]u8 = undefined;
 
-        try std.crypto.random.bytes(&salt);
-        try std.crypto.random.bytes(&iv);
-        try std.crypto.random.bytes(&id);
+        std.crypto.random.bytes(&salt);
+        std.crypto.random.bytes(&iv);
+        std.crypto.random.bytes(&id);
 
-        // Convert private key to bytes
-        const key_u256 = try private_key.toU256();
-        const private_key_bytes = try key_u256.toBytes(allocator);
-        defer allocator.free(private_key_bytes);
+        // Convert private key to bytes (directly use bytes field)
+        const private_key_bytes = &private_key.bytes;
 
         if (private_key_bytes.len != 32) {
             return error.InvalidPrivateKeyLength;
@@ -159,12 +160,10 @@ pub const Keystore = struct {
         const ciphertext = try encryptAES128CTR(allocator, private_key_bytes, derived_key[0..16].*, iv);
 
         // Calculate MAC
-        const mac = try calculateMAC(derived_key[16..32].*, ciphertext);
+        const mac = try calculateMAC(derived_key[16..32], ciphertext);
 
-        const kdfparams: union(enum) {
-            scrypt: ScryptParams,
-            pbkdf2: Pbkdf2Params,
-        } = switch (kdf_type) {
+        // Prepare KDF params
+        const kdfparams: KdfParams = switch (kdf_type) {
             .scrypt => blk: {
                 var params = ScryptParams.default();
                 params.salt = salt;
@@ -177,11 +176,11 @@ pub const Keystore = struct {
             },
         };
 
-        return .{
+        return Keystore{
             .version = .v3,
             .id = id,
             .address = address,
-            .crypto = .{
+            .crypto = KeystoreCrypto{
                 .cipher = .aes_128_ctr,
                 .cipherparams = .{ .iv = iv },
                 .ciphertext = ciphertext,
@@ -205,7 +204,7 @@ pub const Keystore = struct {
         defer self.allocator.free(derived_key);
 
         // Verify MAC
-        const mac = try calculateMAC(derived_key[16..32].*, self.crypto.ciphertext);
+        const mac = try calculateMAC(derived_key[16..32], self.crypto.ciphertext);
         if (!std.mem.eql(u8, &mac, &self.crypto.mac)) {
             return error.InvalidPassword;
         }
@@ -214,7 +213,7 @@ pub const Keystore = struct {
         const private_key_bytes = try decryptAES128CTR(
             self.allocator,
             self.crypto.ciphertext,
-            derived_key[0..16].*,
+            derived_key[0..16].*, // Convert slice to array
             self.crypto.cipherparams.iv,
         );
         defer self.allocator.free(private_key_bytes);
@@ -440,7 +439,7 @@ fn deriveKeyScrypt(allocator: std.mem.Allocator, password: []const u8, salt: [32
     const iterations = 524288; // 2x standard PBKDF2 for scrypt equivalent security
     var key: [32]u8 = undefined;
 
-    std.crypto.pwhash.pbkdf2(
+    try std.crypto.pwhash.pbkdf2(
         &key,
         password,
         &salt,
@@ -457,7 +456,7 @@ fn deriveKeyPbkdf2(allocator: std.mem.Allocator, password: []const u8, salt: [32
     const iterations = 262144;
     var key: [32]u8 = undefined;
 
-    std.crypto.pwhash.pbkdf2(&key, password, &salt, iterations, std.crypto.auth.hmac.sha2.HmacSha256);
+    try std.crypto.pwhash.pbkdf2(&key, password, &salt, iterations, std.crypto.auth.hmac.sha2.HmacSha256);
 
     return try allocator.dupe(u8, &key);
 }
