@@ -17,7 +17,7 @@ A comprehensive Ethereum library for Zig, providing complete cryptographic primi
 | **🔐 Crypto** | ✅ **Production Ready** | ████████████████████ 100% | 27/27 | Keccak-256, secp256k1, ECDSA, Key management |
 | **📡 ABI** | ✅ **Production Ready** | ████████████████████ 100% | 23/23 | Encoding, Decoding, Types, Packed (EIP-712) |
 | **📝 Contract** | ✅ **Production Ready** | ████████████████████ 100% | 19/19 | Calls, Deploy, Events, CREATE2 |
-| **🌐 RPC** | ✅ **Production Ready** | ████████████████████ 100% | 22/22 | Client, eth/net/web3/debug namespaces |
+| **🌐 RPC** | ✅ **Production Ready** | ████████████████████ 100% | 27/27 | Full HTTP client, eth/net/web3/debug |
 | **📜 RLP** | ✅ **Production Ready** | ████████████████████ 100% | 36/36 | Encoding, Decoding, Ethereum types |
 | **🔌 Providers** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | HTTP, WebSocket, IPC |
 | **🔑 Wallet** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Software wallet, Keystore |
@@ -26,13 +26,13 @@ A comprehensive Ethereum library for Zig, providing complete cryptographic primi
 | **🧰 Utils** | ✅ **Production Ready** | ████████████████████ 100% | 35/35 | Hex, Format, Units, Checksum (EIP-55/1191) |
 
 ### Overall Progress
-**Total**: 222/222 tests passing ✅ | **65% Complete** | **8/12 modules production-ready**
+**Total**: 227/227 tests passing ✅ | **65% Complete** | **8/12 modules production-ready**
 
 **Legend**: ✅ Production Ready | 🚧 In Progress | ⏳ Planned
 
 ---
 
-**Current Status**: 222 tests passing | 65% complete | Production-ready crypto, ABI, primitives, contracts, RLP, RPC & utilities
+**Current Status**: 227 tests passing | 65% complete | Production-ready crypto, ABI, primitives, contracts, RLP, RPC & utilities
 
 ## 🏗️ Architecture
 
@@ -152,8 +152,12 @@ zigeth/
   - EIP-55 & EIP-1191 checksummed addresses
   - Powered by [zig-eth-secp256k1](https://github.com/jsign/zig-eth-secp256k1)
 
-- **📡 JSON-RPC Client** (6 modules, 22 tests):
-  - RPC client framework with HTTP transport
+- **📡 JSON-RPC Client** (6 modules, 27 tests):
+  - **Full HTTP transport implementation** using std.http.Client
+  - JSON-RPC 2.0 request/response handling
+  - Automatic JSON serialization/deserialization
+  - Deep JSON value copying for memory safety
+  - Error handling (HTTP errors, JSON-RPC errors)
   - `eth_*` namespace (23 methods) - ALL IMPLEMENTED
     - Block queries (getBlockByNumber, getBlockByHash)
     - Transaction queries (getTransactionByHash, getTransactionReceipt)
@@ -171,6 +175,7 @@ zigeth/
     - Account modification tracking
   - Complete JSON parsing for all complex types (Block, Transaction, Receipt, Log, Trace)
   - Type-safe request/response handling
+  - **Ready for live Ethereum node connections**
 
 - **📦 ABI Encoding/Decoding** (4 modules, 23 tests):
   - Complete ABI type system (uint, int, address, bool, bytes, string, arrays, tuples)
@@ -1248,11 +1253,11 @@ All Ethereum transaction types are fully supported:
 
 ## 📊 Testing & Quality
 
-- **Total Tests**: 222 passing ✓
+- **Total Tests**: 227 passing ✓
   - Primitives: 48 tests
   - Types: 23 tests
   - Crypto: 27 tests
-  - RPC: 22 tests
+  - RPC: 27 tests
   - ABI: 23 tests
   - Contract: 19 tests
   - RLP: 36 tests
