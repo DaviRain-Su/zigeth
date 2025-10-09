@@ -5,6 +5,7 @@ const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
 const U256 = @import("../primitives/uint.zig").U256;
 const Bytes = @import("../primitives/bytes.zig").Bytes;
+const Signature = @import("../primitives/signature.zig").Signature;
 const Block = @import("../types/block.zig").Block;
 const Transaction = @import("../types/transaction.zig").Transaction;
 const Receipt = @import("../types/receipt.zig").Receipt;
@@ -87,9 +88,15 @@ pub const EthNamespace = struct {
 
         const result = try self.client.callWithParams("eth_getBlockByNumber", &params);
 
-        // TODO: Parse JSON block object into Block struct
-        _ = result;
-        return error.NotImplemented;
+        if (result == .null) {
+            return error.BlockNotFound;
+        }
+
+        if (result != .object) {
+            return error.InvalidResponse;
+        }
+
+        return try parseBlockFromJson(self.client.allocator, result.object, full_tx);
     }
 
     /// eth_getBlockByHash - Returns information about a block by hash
@@ -104,9 +111,15 @@ pub const EthNamespace = struct {
 
         const result = try self.client.callWithParams("eth_getBlockByHash", &params);
 
-        // TODO: Parse JSON block object into Block struct
-        _ = result;
-        return error.NotImplemented;
+        if (result == .null) {
+            return error.BlockNotFound;
+        }
+
+        if (result != .object) {
+            return error.InvalidResponse;
+        }
+
+        return try parseBlockFromJson(self.client.allocator, result.object, full_tx);
     }
 
     /// eth_getTransactionByHash - Returns a transaction by hash
@@ -120,9 +133,15 @@ pub const EthNamespace = struct {
 
         const result = try self.client.callWithParams("eth_getTransactionByHash", &params);
 
-        // TODO: Parse JSON transaction object into Transaction struct
-        _ = result;
-        return error.NotImplemented;
+        if (result == .null) {
+            return error.TransactionNotFound;
+        }
+
+        if (result != .object) {
+            return error.InvalidResponse;
+        }
+
+        return try parseTransactionFromJson(self.client.allocator, result.object);
     }
 
     /// eth_getTransactionReceipt - Returns the receipt of a transaction
@@ -136,9 +155,15 @@ pub const EthNamespace = struct {
 
         const result = try self.client.callWithParams("eth_getTransactionReceipt", &params);
 
-        // TODO: Parse JSON receipt object into Receipt struct
-        _ = result;
-        return error.NotImplemented;
+        if (result == .null) {
+            return error.ReceiptNotFound;
+        }
+
+        if (result != .object) {
+            return error.InvalidResponse;
+        }
+
+        return try parseReceiptFromJson(self.client.allocator, result.object);
     }
 
     /// eth_call - Executes a message call (doesn't create a transaction)
@@ -301,9 +326,29 @@ pub const EthNamespace = struct {
 
         const result = try self.client.callWithParams("eth_getLogs", &params);
 
-        // TODO: Parse JSON logs array into Log structs
-        _ = result;
-        return error.NotImplemented;
+        // Parse JSON logs array
+        if (result != .array) {
+            return error.InvalidResponse;
+        }
+
+        var logs = std.ArrayList(Log).init(self.client.allocator);
+        errdefer {
+            for (logs.items) |log| {
+                log.deinit();
+            }
+            logs.deinit();
+        }
+
+        for (result.array.items) |log_json| {
+            if (log_json != .object) {
+                return error.InvalidResponse;
+            }
+
+            const log = try parseLogFromJson(self.client.allocator, log_json.object);
+            try logs.append(log);
+        }
+
+        return try logs.toOwnedSlice();
     }
 
     /// eth_sendRawTransaction - Sends a signed transaction
@@ -666,6 +711,534 @@ fn filterOptionsToJson(allocator: std.mem.Allocator, filter: types.FilterOptions
 
     return JsonObjectWrapper{
         .value = .{ .object = obj },
+        .allocator = allocator,
+    };
+}
+
+/// Parse a Log from JSON object
+fn parseLogFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Log {
+    const hex_module = @import("../utils/hex.zig");
+
+    // Required fields
+    const address_str = obj.get("address") orelse return error.MissingField;
+    if (address_str != .string) return error.InvalidFieldType;
+    const address = try Address.fromHex(address_str.string);
+
+    const data_str = obj.get("data") orelse return error.MissingField;
+    if (data_str != .string) return error.InvalidFieldType;
+    const data_bytes = try hex_module.hexToBytes(allocator, data_str.string);
+    const data = try Bytes.fromSlice(allocator, data_bytes);
+    allocator.free(data_bytes);
+
+    // Parse topics array
+    const topics_json = obj.get("topics") orelse return error.MissingField;
+    if (topics_json != .array) return error.InvalidFieldType;
+
+    var topics = std.ArrayList(Hash).init(allocator);
+    defer topics.deinit();
+
+    for (topics_json.array.items) |topic_val| {
+        if (topic_val != .string) return error.InvalidFieldType;
+        const topic = try Hash.fromHex(topic_val.string);
+        try topics.append(topic);
+    }
+
+    // Create log with required fields
+    var log = try Log.init(allocator, address, topics.items, data);
+
+    // Optional fields
+    if (obj.get("blockNumber")) |block_num| {
+        if (block_num == .string) {
+            log.block_number = try parseHexU64(block_num.string);
+        }
+    }
+
+    if (obj.get("transactionHash")) |tx_hash| {
+        if (tx_hash == .string) {
+            log.transaction_hash = try Hash.fromHex(tx_hash.string);
+        }
+    }
+
+    if (obj.get("transactionIndex")) |tx_idx| {
+        if (tx_idx == .string) {
+            log.transaction_index = try parseHexU64(tx_idx.string);
+        }
+    }
+
+    if (obj.get("logIndex")) |log_idx| {
+        if (log_idx == .string) {
+            log.log_index = try parseHexU64(log_idx.string);
+        }
+    }
+
+    if (obj.get("blockHash")) |block_hash| {
+        if (block_hash == .string) {
+            log.block_hash = try Hash.fromHex(block_hash.string);
+        }
+    }
+
+    if (obj.get("removed")) |removed| {
+        if (removed == .bool) {
+            log.removed = removed.bool;
+        }
+    }
+
+    return log;
+}
+
+/// Parse a Transaction from JSON object
+fn parseTransactionFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Transaction {
+    const hex_module = @import("../utils/hex.zig");
+    const TransactionType = @import("../types/transaction.zig").TransactionType;
+
+    // Parse transaction type
+    const tx_type_val = obj.get("type") orelse obj.get("transactionType");
+    var tx_type: TransactionType = .legacy;
+    if (tx_type_val) |type_val| {
+        if (type_val == .string) {
+            const type_num = try parseHexU64(type_val.string);
+            tx_type = @enumFromInt(type_num);
+        }
+    }
+
+    // Parse required fields
+    const nonce_str = obj.get("nonce") orelse return error.MissingField;
+    if (nonce_str != .string) return error.InvalidFieldType;
+    const nonce = try parseHexU64(nonce_str.string);
+
+    const gas_limit_str = obj.get("gas") orelse return error.MissingField;
+    if (gas_limit_str != .string) return error.InvalidFieldType;
+    const gas_limit = try parseHexU64(gas_limit_str.string);
+
+    const value_str = obj.get("value") orelse return error.MissingField;
+    if (value_str != .string) return error.InvalidFieldType;
+    const value = try U256.fromHex(value_str.string);
+
+    const data_str = obj.get("input") orelse obj.get("data") orelse return error.MissingField;
+    if (data_str != .string) return error.InvalidFieldType;
+    const data_bytes = try hex_module.hexToBytes(allocator, data_str.string);
+    const data = try Bytes.fromSlice(allocator, data_bytes);
+    allocator.free(data_bytes);
+
+    // Parse optional to address
+    var to: ?Address = null;
+    if (obj.get("to")) |to_val| {
+        if (to_val == .string) {
+            to = try Address.fromHex(to_val.string);
+        }
+    }
+
+    // Parse gas price fields based on transaction type
+    var gas_price: ?U256 = null;
+    var max_fee_per_gas: ?U256 = null;
+    var max_priority_fee_per_gas: ?U256 = null;
+
+    if (tx_type == .legacy or tx_type == .eip2930) {
+        if (obj.get("gasPrice")) |gp| {
+            if (gp == .string) {
+                gas_price = try U256.fromHex(gp.string);
+            }
+        }
+    }
+
+    if (tx_type == .eip1559 or tx_type == .eip4844) {
+        if (obj.get("maxFeePerGas")) |max_fee| {
+            if (max_fee == .string) {
+                max_fee_per_gas = try U256.fromHex(max_fee.string);
+            }
+        }
+        if (obj.get("maxPriorityFeePerGas")) |max_priority| {
+            if (max_priority == .string) {
+                max_priority_fee_per_gas = try U256.fromHex(max_priority.string);
+            }
+        }
+    }
+
+    // Create base transaction
+    var tx = Transaction{
+        .type = tx_type,
+        .from = null,
+        .to = to,
+        .nonce = nonce,
+        .gas_limit = gas_limit,
+        .gas_price = gas_price,
+        .max_fee_per_gas = max_fee_per_gas,
+        .max_priority_fee_per_gas = max_priority_fee_per_gas,
+        .value = value,
+        .data = data,
+        .chain_id = null,
+        .access_list = null,
+        .authorization_list = null,
+        .signature = null,
+        .hash = null,
+        .block_hash = null,
+        .block_number = null,
+        .transaction_index = null,
+        .allocator = allocator,
+    };
+
+    // Parse optional fields
+    if (obj.get("from")) |from_val| {
+        if (from_val == .string) {
+            tx.from = try Address.fromHex(from_val.string);
+        }
+    }
+
+    if (obj.get("chainId")) |chain_val| {
+        if (chain_val == .string) {
+            tx.chain_id = try parseHexU64(chain_val.string);
+        }
+    }
+
+    if (obj.get("hash")) |hash_val| {
+        if (hash_val == .string) {
+            tx.hash = try Hash.fromHex(hash_val.string);
+        }
+    }
+
+    if (obj.get("blockHash")) |block_hash_val| {
+        if (block_hash_val == .string) {
+            tx.block_hash = try Hash.fromHex(block_hash_val.string);
+        }
+    }
+
+    if (obj.get("blockNumber")) |block_num_val| {
+        if (block_num_val == .string) {
+            tx.block_number = try parseHexU64(block_num_val.string);
+        }
+    }
+
+    if (obj.get("transactionIndex")) |tx_idx_val| {
+        if (tx_idx_val == .string) {
+            tx.transaction_index = try parseHexU64(tx_idx_val.string);
+        }
+    }
+
+    // Parse signature (v, r, s)
+    const v_val = obj.get("v");
+    const r_val = obj.get("r");
+    const s_val = obj.get("s");
+
+    if (v_val != null and r_val != null and s_val != null) {
+        if (v_val.? == .string and r_val.? == .string and s_val.? == .string) {
+            const v = try parseHexU64(v_val.?.string);
+            const r = try U256.fromHex(r_val.?.string);
+            const s = try U256.fromHex(s_val.?.string);
+
+            tx.signature = Signature.init(r, s, @intCast(v));
+        }
+    }
+
+    return tx;
+}
+
+/// Parse a Receipt from JSON object
+fn parseReceiptFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Receipt {
+    const TransactionStatus = @import("../types/receipt.zig").TransactionStatus;
+
+    // Required fields
+    const tx_hash_str = obj.get("transactionHash") orelse return error.MissingField;
+    if (tx_hash_str != .string) return error.InvalidFieldType;
+    const transaction_hash = try Hash.fromHex(tx_hash_str.string);
+
+    const tx_index_str = obj.get("transactionIndex") orelse return error.MissingField;
+    if (tx_index_str != .string) return error.InvalidFieldType;
+    const transaction_index = try parseHexU64(tx_index_str.string);
+
+    const block_hash_str = obj.get("blockHash") orelse return error.MissingField;
+    if (block_hash_str != .string) return error.InvalidFieldType;
+    const block_hash = try Hash.fromHex(block_hash_str.string);
+
+    const block_num_str = obj.get("blockNumber") orelse return error.MissingField;
+    if (block_num_str != .string) return error.InvalidFieldType;
+    const block_number = try parseHexU64(block_num_str.string);
+
+    const from_str = obj.get("from") orelse return error.MissingField;
+    if (from_str != .string) return error.InvalidFieldType;
+    const from = try Address.fromHex(from_str.string);
+
+    // Optional to address
+    var to: ?Address = null;
+    if (obj.get("to")) |to_val| {
+        if (to_val == .string) {
+            to = try Address.fromHex(to_val.string);
+        }
+    }
+
+    const cum_gas_str = obj.get("cumulativeGasUsed") orelse return error.MissingField;
+    if (cum_gas_str != .string) return error.InvalidFieldType;
+    const cumulative_gas_used = try parseHexU64(cum_gas_str.string);
+
+    const gas_used_str = obj.get("gasUsed") orelse return error.MissingField;
+    if (gas_used_str != .string) return error.InvalidFieldType;
+    const gas_used = try parseHexU64(gas_used_str.string);
+
+    const eff_gas_price_str = obj.get("effectiveGasPrice") orelse return error.MissingField;
+    if (eff_gas_price_str != .string) return error.InvalidFieldType;
+    const effective_gas_price = try U256.fromHex(eff_gas_price_str.string);
+
+    // Parse logs
+    const logs_json = obj.get("logs") orelse return error.MissingField;
+    if (logs_json != .array) return error.InvalidFieldType;
+
+    var logs = std.ArrayList(Log).init(allocator);
+    defer logs.deinit();
+
+    for (logs_json.array.items) |log_json| {
+        if (log_json != .object) return error.InvalidFieldType;
+        const log = try parseLogFromJson(allocator, log_json.object);
+        try logs.append(log);
+    }
+
+    const logs_bloom_str = obj.get("logsBloom") orelse return error.MissingField;
+    if (logs_bloom_str != .string) return error.InvalidFieldType;
+    const logs_bloom = try @import("../primitives/bloom.zig").Bloom.fromHex(logs_bloom_str.string);
+
+    const tx_type_str = obj.get("type") orelse return error.MissingField;
+    if (tx_type_str != .string) return error.InvalidFieldType;
+    const transaction_type = @as(u8, @intCast(try parseHexU64(tx_type_str.string)));
+
+    // Parse status or root
+    var status: ?TransactionStatus = null;
+    var root: ?Hash = null;
+
+    if (obj.get("status")) |status_val| {
+        if (status_val == .string) {
+            const status_num = try parseHexU64(status_val.string);
+            status = @enumFromInt(status_num);
+        }
+    }
+
+    if (obj.get("root")) |root_val| {
+        if (root_val == .string) {
+            root = try Hash.fromHex(root_val.string);
+        }
+    }
+
+    // Optional contract address
+    var contract_address: ?Address = null;
+    if (obj.get("contractAddress")) |addr_val| {
+        if (addr_val == .string) {
+            contract_address = try Address.fromHex(addr_val.string);
+        }
+    }
+
+    return Receipt{
+        .transaction_hash = transaction_hash,
+        .transaction_index = transaction_index,
+        .block_hash = block_hash,
+        .block_number = block_number,
+        .from = from,
+        .to = to,
+        .cumulative_gas_used = cumulative_gas_used,
+        .gas_used = gas_used,
+        .effective_gas_price = effective_gas_price,
+        .contract_address = contract_address,
+        .logs = try logs.toOwnedSlice(),
+        .logs_bloom = logs_bloom,
+        .transaction_type = transaction_type,
+        .status = status,
+        .root = root,
+        .allocator = allocator,
+    };
+}
+
+/// Parse a Block from JSON object
+fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, full_tx: bool) !Block {
+    const hex_module = @import("../utils/hex.zig");
+    const BlockHeader = @import("../types/block.zig").BlockHeader;
+    const Bloom = @import("../primitives/bloom.zig").Bloom;
+
+    // Parse hash
+    const hash_str = obj.get("hash") orelse return error.MissingField;
+    if (hash_str != .string) return error.InvalidFieldType;
+    const hash = try Hash.fromHex(hash_str.string);
+
+    // Parse header fields
+    const parent_hash_str = obj.get("parentHash") orelse return error.MissingField;
+    if (parent_hash_str != .string) return error.InvalidFieldType;
+    const parent_hash = try Hash.fromHex(parent_hash_str.string);
+
+    const uncle_hash_str = obj.get("sha3Uncles") orelse return error.MissingField;
+    if (uncle_hash_str != .string) return error.InvalidFieldType;
+    const uncle_hash = try Hash.fromHex(uncle_hash_str.string);
+
+    const miner_str = obj.get("miner") orelse return error.MissingField;
+    if (miner_str != .string) return error.InvalidFieldType;
+    const miner = try Address.fromHex(miner_str.string);
+
+    const state_root_str = obj.get("stateRoot") orelse return error.MissingField;
+    if (state_root_str != .string) return error.InvalidFieldType;
+    const state_root = try Hash.fromHex(state_root_str.string);
+
+    const tx_root_str = obj.get("transactionsRoot") orelse return error.MissingField;
+    if (tx_root_str != .string) return error.InvalidFieldType;
+    const transactions_root = try Hash.fromHex(tx_root_str.string);
+
+    const receipts_root_str = obj.get("receiptsRoot") orelse return error.MissingField;
+    if (receipts_root_str != .string) return error.InvalidFieldType;
+    const receipts_root = try Hash.fromHex(receipts_root_str.string);
+
+    const logs_bloom_str = obj.get("logsBloom") orelse return error.MissingField;
+    if (logs_bloom_str != .string) return error.InvalidFieldType;
+    const logs_bloom = try Bloom.fromHex(logs_bloom_str.string);
+
+    const difficulty_str = obj.get("difficulty") orelse return error.MissingField;
+    if (difficulty_str != .string) return error.InvalidFieldType;
+    const difficulty = try U256.fromHex(difficulty_str.string);
+
+    const number_str = obj.get("number") orelse return error.MissingField;
+    if (number_str != .string) return error.InvalidFieldType;
+    const number = try parseHexU64(number_str.string);
+
+    const gas_limit_str = obj.get("gasLimit") orelse return error.MissingField;
+    if (gas_limit_str != .string) return error.InvalidFieldType;
+    const gas_limit_block = try parseHexU64(gas_limit_str.string);
+
+    const gas_used_str = obj.get("gasUsed") orelse return error.MissingField;
+    if (gas_used_str != .string) return error.InvalidFieldType;
+    const gas_used = try parseHexU64(gas_used_str.string);
+
+    const timestamp_str = obj.get("timestamp") orelse return error.MissingField;
+    if (timestamp_str != .string) return error.InvalidFieldType;
+    const timestamp = try parseHexU64(timestamp_str.string);
+
+    const extra_data_str = obj.get("extraData") orelse return error.MissingField;
+    if (extra_data_str != .string) return error.InvalidFieldType;
+    const extra_data_bytes = try hex_module.hexToBytes(allocator, extra_data_str.string);
+    const extra_data = try Bytes.fromSlice(allocator, extra_data_bytes);
+    allocator.free(extra_data_bytes);
+
+    const mix_hash_str = obj.get("mixHash") orelse return error.MissingField;
+    if (mix_hash_str != .string) return error.InvalidFieldType;
+    const mix_hash = try Hash.fromHex(mix_hash_str.string);
+
+    const nonce_str = obj.get("nonce") orelse return error.MissingField;
+    if (nonce_str != .string) return error.InvalidFieldType;
+    const block_nonce = try parseHexU64(nonce_str.string);
+
+    // Optional fields for different forks
+    var base_fee_per_gas: ?U256 = null;
+    if (obj.get("baseFeePerGas")) |base_fee| {
+        if (base_fee == .string) {
+            base_fee_per_gas = try U256.fromHex(base_fee.string);
+        }
+    }
+
+    var withdrawals_root: ?Hash = null;
+    if (obj.get("withdrawalsRoot")) |wd_root| {
+        if (wd_root == .string) {
+            withdrawals_root = try Hash.fromHex(wd_root.string);
+        }
+    }
+
+    var blob_gas_used: ?u64 = null;
+    if (obj.get("blobGasUsed")) |blob_gas| {
+        if (blob_gas == .string) {
+            blob_gas_used = try parseHexU64(blob_gas.string);
+        }
+    }
+
+    var excess_blob_gas: ?u64 = null;
+    if (obj.get("excessBlobGas")) |excess| {
+        if (excess == .string) {
+            excess_blob_gas = try parseHexU64(excess.string);
+        }
+    }
+
+    var parent_beacon_block_root: ?Hash = null;
+    if (obj.get("parentBeaconBlockRoot")) |beacon| {
+        if (beacon == .string) {
+            parent_beacon_block_root = try Hash.fromHex(beacon.string);
+        }
+    }
+
+    // Create header
+    const header = BlockHeader{
+        .parent_hash = parent_hash,
+        .uncle_hash = uncle_hash,
+        .miner = miner,
+        .state_root = state_root,
+        .transactions_root = transactions_root,
+        .receipts_root = receipts_root,
+        .logs_bloom = logs_bloom,
+        .difficulty = difficulty,
+        .number = number,
+        .gas_limit = gas_limit_block,
+        .gas_used = gas_used,
+        .timestamp = timestamp,
+        .extra_data = extra_data,
+        .mix_hash = mix_hash,
+        .nonce = block_nonce,
+        .base_fee_per_gas = base_fee_per_gas,
+        .withdrawals_root = withdrawals_root,
+        .blob_gas_used = blob_gas_used,
+        .excess_blob_gas = excess_blob_gas,
+        .parent_beacon_block_root = parent_beacon_block_root,
+    };
+
+    // Parse transactions
+    const transactions_json = obj.get("transactions") orelse return error.MissingField;
+    if (transactions_json != .array) return error.InvalidFieldType;
+
+    var transactions = std.ArrayList(Transaction).init(allocator);
+    defer transactions.deinit();
+
+    if (full_tx) {
+        // Full transaction objects
+        for (transactions_json.array.items) |tx_json| {
+            if (tx_json != .object) return error.InvalidFieldType;
+            const tx = try parseTransactionFromJson(allocator, tx_json.object);
+            try transactions.append(tx);
+        }
+    } else {
+        // Just transaction hashes - create minimal transaction structs
+        for (transactions_json.array.items) |tx_hash_json| {
+            if (tx_hash_json != .string) return error.InvalidFieldType;
+            const tx_hash = try Hash.fromHex(tx_hash_json.string);
+
+            // Create minimal transaction with just hash
+            const empty_data = try Bytes.fromSlice(allocator, &[_]u8{});
+            const tx = Transaction{
+                .type = .legacy,
+                .from = null,
+                .to = null,
+                .nonce = 0,
+                .gas_limit = 0,
+                .gas_price = null,
+                .max_fee_per_gas = null,
+                .max_priority_fee_per_gas = null,
+                .value = U256.zero(),
+                .data = empty_data,
+                .chain_id = null,
+                .access_list = null,
+                .authorization_list = null,
+                .signature = null,
+                .hash = tx_hash,
+                .block_hash = null,
+                .block_number = null,
+                .transaction_index = null,
+                .allocator = allocator,
+            };
+            try transactions.append(tx);
+        }
+    }
+
+    // Parse uncles (uncle hashes only)
+    const uncles_json = obj.get("uncles") orelse return error.MissingField;
+    if (uncles_json != .array) return error.InvalidFieldType;
+
+    // For now, create empty uncles array (full uncle parsing would require more work)
+    const uncles = [_]BlockHeader{};
+
+    return Block{
+        .hash = hash,
+        .header = header,
+        .transactions = try transactions.toOwnedSlice(),
+        .uncles = try allocator.dupe(BlockHeader, &uncles),
+        .withdrawals = null, // TODO: Parse withdrawals if present
+        .blob_gas_used = blob_gas_used,
+        .excess_blob_gas = excess_blob_gas,
         .allocator = allocator,
     };
 }
