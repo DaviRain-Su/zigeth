@@ -34,6 +34,9 @@ jobs:
             target: x86_64-windows
             artifact: zigeth-windows-x86_64.zip
 
+    env:
+      ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.zig-cache/global
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -42,15 +45,6 @@ jobs:
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.14.1
-
-      - name: Create cache directory (Unix)
-        if: runner.os != 'Windows'
-        run: mkdir -p $HOME/.cache/zig
-
-      - name: Create cache directory (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: New-Item -Path "$env:LOCALAPPDATA\zig" -ItemType Directory -Force
 
       - name: Build Release
         run: zig build -Doptimize=ReleaseFast
