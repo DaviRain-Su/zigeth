@@ -22,17 +22,17 @@ A comprehensive Ethereum library for Zig, providing complete cryptographic primi
 | **🔌 Providers** | ✅ **Production Ready** | ████████████████████ 100% | 23/23 | HTTP, WebSocket, IPC, Mock, Networks |
 | **🧰 Utils** | ✅ **Production Ready** | ████████████████████ 100% | 35/35 | Hex, Format, Units, Checksum (EIP-55/1191) |
 | **⚡ Solidity** | ✅ **Production Ready** | ████████████████████ 100% | 15/15 | Type mappings, Standard interfaces, Helpers |
+| **⚙️ Middleware** | ✅ **Production Ready** | ████████████████████ 100% | 23/23 | Gas, Nonce, Transaction Signing |
 | **🔑 Wallet** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Software wallet, Keystore |
-| **⚙️ Middleware** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Gas, Nonce, Signing |
 
 ### Overall Progress
-**Total**: 276/276 tests passing ✅ | **83% Complete** | **10/12 modules production-ready**
+**Total**: 299/299 tests passing ✅ | **92% Complete** | **11/12 modules production-ready**
 
 **Legend**: ✅ Production Ready | 🚧 In Progress | ⏳ Planned
 
 ---
 
-**Current Status**: 276 tests passing | 83% complete | Production-ready crypto, ABI, primitives, contracts, RLP, RPC, Solidity, full Providers (HTTP/WS/IPC) & utilities
+**Current Status**: 299 tests passing | 92% complete | Production-ready crypto, ABI, primitives, contracts, RLP, RPC, Solidity, Providers, Middleware & utilities
 
 ## 🏗️ Architecture
 
@@ -252,10 +252,29 @@ zigeth/
   - Transaction waiting with timeout
   - Contract detection (isContract)
 
+- **⚙️ Middleware** (3 modules, 23 tests):
+  - `GasMiddleware` - Automatic gas price and limit management
+    - EIP-1559 fee estimation (maxFeePerGas, maxPriorityFeePerGas)
+    - Legacy gas price support
+    - Configurable strategies (slow, standard, fast, custom)
+    - Gas limit estimation with safety buffer
+    - Fee history analysis and caching
+    - Balance sufficiency checking
+  - `NonceMiddleware` - Nonce tracking and management
+    - Multiple strategies (provider, local, hybrid)
+    - Pending transaction tracking
+    - Automatic nonce synchronization
+    - Gap detection and recovery
+    - Per-address nonce caching
+  - `SignerMiddleware` - Transaction signing
+    - EIP-155 replay protection
+    - Support for all transaction types (Legacy, EIP-2930, EIP-1559, EIP-4844, EIP-7702)
+    - Message signing (personal messages, typed data)
+    - Chain-specific configurations (mainnet, sepolia, polygon, etc.)
+
 ### 🚧 **Planned Features**
 
 - **🔑 Wallet Management**: Software wallets, keystore, and hardware wallet support
-- **⚙️ Middleware**: Gas estimation, nonce management, and transaction signing
 
 ## 📋 Requirements
 
@@ -1613,6 +1632,205 @@ mock.mineBlock(); // Increments block number
 
 // Reset state
 mock.reset(); // Back to initial state
+```
+
+## ⚙️ Middleware
+
+Middleware modules provide automatic management of gas, nonces, and transaction signing.
+
+### Gas Middleware
+
+Automatic gas price and limit estimation:
+
+```zig
+const zigeth = @import("zigeth");
+
+var provider = try zigeth.providers.Networks.mainnet(allocator);
+defer provider.deinit();
+
+// Create gas middleware with standard strategy
+const gas_config = zigeth.middleware.GasConfig.default();
+var gas_middleware = zigeth.middleware.GasMiddleware.init(allocator, &provider, gas_config);
+
+// Get current gas price (with strategy multiplier)
+const gas_price = try gas_middleware.getGasPrice();
+const gas_price_gwei = try gas_middleware.getGasPriceGwei();
+std.debug.print("Gas price: {} gwei\n", .{gas_price_gwei});
+
+// Get EIP-1559 fee data
+const fee_data = try gas_middleware.getFeeData();
+std.debug.print("Max fee: {}\n", .{fee_data.max_fee_per_gas});
+std.debug.print("Priority fee: {}\n", .{fee_data.max_priority_fee_per_gas});
+
+// Estimate gas limit for a transaction
+const gas_limit = try gas_middleware.estimateGasLimit(from, to, data);
+
+// Calculate total transaction cost
+const tx_cost = try gas_middleware.calculateTxCost(gas_limit);
+
+// Check if account has sufficient balance
+const has_balance = try gas_middleware.checkSufficientBalance(from, value, gas_limit);
+
+// Apply gas settings to a transaction
+try gas_middleware.applyGasSettings(&transaction);
+
+// Different strategies
+const slow_config = zigeth.middleware.GasConfig.slow(); // 90% of base
+const fast_config = zigeth.middleware.GasConfig.fast(); // 120% of base
+const custom_config = zigeth.middleware.GasConfig.custom(
+    zigeth.primitives.U256.fromInt(50_000_000_000),  // max fee
+    zigeth.primitives.U256.fromInt(2_000_000_000),   // priority fee
+);
+```
+
+### Nonce Middleware
+
+Automatic nonce tracking and management:
+
+```zig
+const zigeth = @import("zigeth");
+
+var provider = try zigeth.providers.Networks.mainnet(allocator);
+defer provider.deinit();
+
+// Create nonce middleware with local strategy
+var nonce_middleware = try zigeth.middleware.NonceMiddleware.init(
+    allocator,
+    &provider,
+    .local, // Can be .provider, .local, or .hybrid
+);
+defer nonce_middleware.deinit();
+
+// Get next nonce for an address
+const nonce = try nonce_middleware.getNextNonce(address);
+
+// Reserve a nonce (increments local counter)
+const reserved_nonce = try nonce_middleware.reserveNonce(address);
+
+// Track pending transaction
+try nonce_middleware.trackPendingTx(address, reserved_nonce, tx_hash);
+
+// Get pending transaction count
+const pending_count = nonce_middleware.getPendingCount(address);
+
+// Check if nonce is pending
+const is_pending = nonce_middleware.isNoncePending(address, nonce);
+
+// Sync nonce with provider (force refresh)
+const synced_nonce = try nonce_middleware.syncNonce(address);
+
+// Get nonce gap (difference between local and provider)
+const gap = try nonce_middleware.getNonceGap(address);
+
+// Clean up old pending transactions (older than 5 minutes)
+nonce_middleware.cleanupOldPending(address, 300);
+
+// Reset nonce for an address
+nonce_middleware.resetNonce(address);
+```
+
+### Signer Middleware
+
+Transaction signing with EIP-155 replay protection:
+
+```zig
+const zigeth = @import("zigeth");
+
+// Create private key
+const private_key = zigeth.crypto.PrivateKey.fromBytes(key_bytes);
+
+// Create signer middleware for mainnet
+const signer_config = zigeth.middleware.SignerConfig.mainnet(); // Chain ID: 1
+var signer_middleware = try zigeth.middleware.SignerMiddleware.init(
+    allocator,
+    private_key,
+    signer_config,
+);
+
+// Get address associated with this signer
+const address = try signer_middleware.getAddress();
+
+// Sign a transaction
+const signature = try signer_middleware.signTransaction(&transaction);
+
+// Sign and serialize transaction to raw bytes
+const raw_tx = try signer_middleware.signAndSerialize(&transaction);
+defer allocator.free(raw_tx);
+
+// Send the signed transaction
+const tx_hash = try provider.sendRawTransaction(raw_tx);
+
+// Sign a message
+const message = "Hello, Ethereum!";
+const message_sig = try signer_middleware.signMessage(message);
+
+// Sign a personal message (with Ethereum prefix)
+const personal_sig = try signer_middleware.signPersonalMessage(message);
+
+// Chain-specific configurations
+const sepolia_config = zigeth.middleware.SignerConfig.sepolia();    // Chain ID: 11155111
+const polygon_config = zigeth.middleware.SignerConfig.polygon();    // Chain ID: 137
+const arbitrum_config = zigeth.middleware.SignerConfig.arbitrum();  // Chain ID: 42161
+const optimism_config = zigeth.middleware.SignerConfig.optimism();  // Chain ID: 10
+const custom_config = zigeth.middleware.SignerConfig.custom(12345); // Custom chain ID
+```
+
+### Combined Middleware Usage
+
+Using all middleware together for seamless transaction sending:
+
+```zig
+const zigeth = @import("zigeth");
+
+// Setup
+var provider = try zigeth.providers.Networks.mainnet(allocator);
+defer provider.deinit();
+
+const private_key = zigeth.crypto.PrivateKey.fromBytes(key_bytes);
+const signer_config = zigeth.middleware.SignerConfig.mainnet();
+var signer_middleware = try zigeth.middleware.SignerMiddleware.init(
+    allocator,
+    private_key,
+    signer_config,
+);
+
+const gas_config = zigeth.middleware.GasConfig.fast(); // Fast transaction
+var gas_middleware = zigeth.middleware.GasMiddleware.init(allocator, &provider, gas_config);
+
+var nonce_middleware = try zigeth.middleware.NonceMiddleware.init(allocator, &provider, .hybrid);
+defer nonce_middleware.deinit();
+
+// Get sender address
+const from = try signer_middleware.getAddress();
+
+// Create transaction
+var tx = zigeth.types.Transaction.newEip1559(allocator);
+tx.from = from;
+tx.to = to_address;
+tx.value = zigeth.primitives.U256.fromInt(1_000_000_000_000_000_000); // 1 ETH
+tx.data = &[_]u8{};
+
+// Apply middleware
+tx.nonce = try nonce_middleware.reserveNonce(from);
+tx.gas_limit = try gas_middleware.estimateGasLimit(from, to_address, tx.data);
+try gas_middleware.applyGasSettings(&tx);
+
+// Check balance
+const has_balance = try gas_middleware.checkSufficientBalance(from, tx.value, tx.gas_limit);
+if (!has_balance) {
+    return error.InsufficientBalance;
+}
+
+// Sign and send
+const raw_tx = try signer_middleware.signAndSerialize(&tx);
+defer allocator.free(raw_tx);
+
+const tx_hash = try provider.sendRawTransaction(raw_tx);
+
+// Track pending transaction
+try nonce_middleware.trackPendingTx(from, tx.nonce, tx_hash.bytes);
+
+std.debug.print("Transaction sent: {}\n", .{tx_hash});
 ```
 
 ### Provider Comparison

@@ -164,6 +164,24 @@ pub const utils = struct {
     pub const checksum = @import("utils/checksum.zig");
 };
 
+pub const middleware = struct {
+    const gas_mod = @import("middleware/gas.zig");
+    const nonce_mod = @import("middleware/nonce.zig");
+    const signer_mod = @import("middleware/signer.zig");
+
+    pub const GasStrategy = gas_mod.GasStrategy;
+    pub const GasConfig = gas_mod.GasConfig;
+    pub const FeeData = gas_mod.FeeData;
+    pub const GasMiddleware = gas_mod.GasMiddleware;
+
+    pub const NonceStrategy = nonce_mod.NonceStrategy;
+    pub const PendingTransaction = nonce_mod.PendingTransaction;
+    pub const NonceMiddleware = nonce_mod.NonceMiddleware;
+
+    pub const SignerConfig = signer_mod.SignerConfig;
+    pub const SignerMiddleware = signer_mod.SignerMiddleware;
+};
+
 test {
     std.testing.refAllDecls(@This());
 }
