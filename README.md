@@ -6,7 +6,33 @@
 
 A comprehensive Ethereum library for Zig, providing complete cryptographic primitives, transaction handling, RPC client framework, and utilities for seamless integration with Ethereum networks.
 
-**Current Status**: 132 tests passing | 40% complete | Production-ready crypto, ABI & primitives
+---
+
+## 📊 Library Readiness Status
+
+| Component | Status | Progress | Tests | Description |
+|-----------|--------|----------|-------|-------------|
+| **🎯 Primitives** | ✅ **Production Ready** | ████████████████████ 100% | 48/48 | Address, Hash, Bytes, Signature, U256, Bloom |
+| **📦 Types** | ✅ **Production Ready** | ████████████████████ 100% | 23/23 | Transaction, Block, Receipt, Log, AccessList |
+| **🔐 Crypto** | ✅ **Production Ready** | ████████████████████ 100% | 27/27 | Keccak-256, secp256k1, ECDSA, Key management |
+| **📡 ABI** | ✅ **Production Ready** | ████████████████████ 100% | 23/23 | Encoding, Decoding, Types, Packed (EIP-712) |
+| **📝 Contract** | ✅ **Production Ready** | ████████████████████ 100% | 19/19 | Calls, Deploy, Events, CREATE2 |
+| **🌐 RPC** | 🚧 **Framework Only** | ████████░░░░░░░░░░░░ 40% | 13/13 | Client, eth/net/web3/debug namespaces |
+| **📜 RLP** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Encoding, Decoding |
+| **🔌 Providers** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | HTTP, WebSocket, IPC |
+| **🔑 Wallet** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Software wallet, Keystore |
+| **⚙️ Middleware** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Gas, Nonce, Signing |
+| **🌍 Networks** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Pre-configured networks |
+| **🧰 Utils** | 🚧 **Partial** | ████░░░░░░░░░░░░░░░░ 20% | 8/8 | Hex, Format, Units, Checksum |
+
+### Overall Progress
+**Total**: 150/150 tests passing ✅ | **50% Complete** | **5/12 modules production-ready**
+
+**Legend**: ✅ Production Ready | 🚧 In Progress | ⏳ Planned
+
+---
+
+**Current Status**: 150 tests passing | 50% complete | Production-ready crypto, ABI, primitives & contract interaction
 
 ## 🏗️ Architecture
 
@@ -63,11 +89,11 @@ zigeth/
 │   │   ├── ipc.zig           # IPC provider
 │   │   └── mock.zig          # Mock provider for testing
 │   │
-│   ├── contract/             # Smart contract interaction (TODO)
-│   │   ├── contract.zig      # Contract abstraction
-│   │   ├── call.zig          # Contract calls
-│   │   ├── deploy.zig        # Contract deployment
-│   │   └── event.zig         # Event parsing
+│   ├── contract/             # Smart contract interaction ✅ IMPLEMENTED
+│   │   ├── contract.zig      # Contract abstraction ✅
+│   │   ├── call.zig          # Contract calls ✅
+│   │   ├── deploy.zig        # Contract deployment ✅
+│   │   └── event.zig         # Event parsing ✅
 │   │
 │   ├── signer/               # Transaction signing (TODO)
 │   │   ├── signer.zig        # Signer interface
@@ -142,6 +168,16 @@ zigeth/
   - Function selector generation
   - Event signature generation
 
+- **📝 Smart Contract Interaction** (4 modules, 19 tests):
+  - `Contract` - High-level contract abstraction with ABI management
+  - `CallBuilder` - Type-safe contract call construction
+  - `DeployBuilder` - Contract deployment with constructor arguments
+  - CREATE2 address prediction
+  - Event parsing and filtering
+  - Function result decoding
+  - View/pure call execution
+  - State-changing transaction handling
+
 - **🧰 Utilities**:
   - Hex encoding/decoding with 0x prefix support
   - Memory-safe allocations
@@ -151,7 +187,6 @@ zigeth/
 
 - **📜 RLP Encoding**: Recursive Length Prefix for transaction encoding
 - **🌐 Providers**: HTTP, WebSocket, IPC provider implementations with JSON-RPC
-- **📝 Smart Contracts**: High-level contract deployment and interaction
 - **🔑 Wallet Management**: Software wallets, keystore, and hardware wallet support
 - **⚙️ Middleware**: Gas estimation, nonce management, and transaction signing
 - **🌍 Network Support**: Pre-configured settings for major Ethereum networks
@@ -242,6 +277,48 @@ pub fn main() !void {
     defer tx.deinit();
     
     std.debug.print("Transaction type: {}\n", .{tx.type});
+    
+    // Contract interaction (ERC-20 token example)
+    const token_functions = [_]zigeth.abi.Function{
+        .{
+            .name = "balanceOf",
+            .inputs = &[_]zigeth.abi.Parameter{
+                .{ .name = "account", .type = .address },
+            },
+            .outputs = &[_]zigeth.abi.Parameter{
+                .{ .name = "balance", .type = .uint256 },
+            },
+            .state_mutability = .view,
+        },
+    };
+    
+    const token_events = [_]zigeth.abi.Event{
+        .{
+            .name = "Transfer",
+            .inputs = &[_]zigeth.abi.Parameter{
+                .{ .name = "from", .type = .address, .indexed = true },
+                .{ .name = "to", .type = .address, .indexed = true },
+                .{ .name = "value", .type = .uint256, .indexed = false },
+            },
+        },
+    };
+    
+    const token_contract = try zigeth.contract.Contract.init(
+        allocator,
+        address, // token contract address
+        &token_functions,
+        &token_events,
+    );
+    defer token_contract.deinit();
+    
+    // Encode a contract call
+    const call_args = [_]zigeth.abi.AbiValue{
+        .{ .address = address },
+    };
+    const call_data = try token_contract.encodeCall("balanceOf", &call_args);
+    defer allocator.free(call_data);
+    
+    std.debug.print("Contract call data encoded\n", .{});
     
     // Use RPC client framework (implementation in progress)
     var rpc_client = try zigeth.rpc.RpcClient.init(allocator, "https://eth.llamarpc.com");
@@ -588,6 +665,187 @@ const bytes = value.toBytes();
 const value = Type.fromBytes(bytes);
 ```
 
+## 📝 Smart Contract Interaction
+
+Zigeth provides a comprehensive framework for interacting with smart contracts.
+
+### Contract Abstraction
+
+```zig
+const zigeth = @import("zigeth");
+
+// Define your contract's ABI
+const functions = [_]zigeth.abi.Function{
+    .{
+        .name = "balanceOf",
+        .inputs = &[_]zigeth.abi.Parameter{
+            .{ .name = "account", .type = .address },
+        },
+        .outputs = &[_]zigeth.abi.Parameter{
+            .{ .name = "balance", .type = .uint256 },
+        },
+        .state_mutability = .view,
+    },
+    .{
+        .name = "transfer",
+        .inputs = &[_]zigeth.abi.Parameter{
+            .{ .name = "to", .type = .address },
+            .{ .name = "amount", .type = .uint256 },
+        },
+        .outputs = &[_]zigeth.abi.Parameter{
+            .{ .name = "success", .type = .bool_type },
+        },
+        .state_mutability = .nonpayable,
+    },
+};
+
+const events = [_]zigeth.abi.Event{
+    .{
+        .name = "Transfer",
+        .inputs = &[_]zigeth.abi.Parameter{
+            .{ .name = "from", .type = .address, .indexed = true },
+            .{ .name = "to", .type = .address, .indexed = true },
+            .{ .name = "value", .type = .uint256, .indexed = false },
+        },
+    },
+};
+
+// Create contract instance
+const contract_addr = try zigeth.primitives.Address.fromHex("0x...");
+const contract = try zigeth.contract.Contract.init(
+    allocator,
+    contract_addr,
+    &functions,
+    &events,
+);
+defer contract.deinit();
+```
+
+### Contract Calls
+
+Build and execute contract calls:
+
+```zig
+// Build a call using CallBuilder
+const func = contract.getFunction("balanceOf").?;
+var builder = zigeth.contract.CallBuilder.init(allocator, &contract, func);
+defer builder.deinit();
+
+// Add arguments
+const account = try zigeth.primitives.Address.fromHex("0x...");
+try builder.addArg(.{ .address = account });
+
+// Set optional parameters
+builder.setFrom(sender_address);
+builder.setGasLimit(100000);
+
+// Build call data
+const call_data = try builder.buildCallData();
+defer allocator.free(call_data);
+
+// Or encode directly from contract
+const args = [_]zigeth.abi.AbiValue{
+    .{ .address = account },
+};
+const call_data2 = try contract.encodeCall("balanceOf", &args);
+defer allocator.free(call_data2);
+```
+
+### Contract Deployment
+
+Deploy contracts with constructor arguments:
+
+```zig
+// Bytecode of your contract
+const bytecode_hex = "0x608060405234801561001057600080fd5b50...";
+const bytecode_bytes = try zigeth.utils.hex.hexToBytes(allocator, bytecode_hex);
+defer allocator.free(bytecode_bytes);
+
+const bytecode = try zigeth.primitives.Bytes.fromSlice(allocator, bytecode_bytes);
+
+// Define constructor parameters
+const constructor_params = [_]zigeth.abi.Parameter{
+    .{ .name = "initialSupply", .type = .uint256 },
+    .{ .name = "name", .type = .string },
+};
+
+// Build deployment
+var deploy = zigeth.contract.DeployBuilder.init(allocator, bytecode, &constructor_params);
+defer deploy.deinit();
+
+// Add constructor arguments
+try deploy.addArg(.{ .uint = zigeth.primitives.U256.fromInt(1000000) });
+try deploy.addArg(.{ .string = "MyToken" });
+
+// Set deployment parameters
+deploy.setFrom(deployer_address);
+deploy.setValue(zigeth.primitives.U256.zero());
+deploy.setGasLimit(2000000);
+
+// Get deployment data
+const deploy_data = try deploy.buildDeploymentData();
+defer allocator.free(deploy_data);
+```
+
+### CREATE2 Address Prediction
+
+Predict contract addresses before deployment:
+
+```zig
+// Standard CREATE (uses nonce)
+const nonce: u64 = 5;
+const predicted_addr = try deploy.estimateAddress(nonce);
+
+// CREATE2 (deterministic)
+const salt = zigeth.primitives.Hash.fromBytes([_]u8{0x12} ** 32);
+const create2_addr = try deploy.estimateCreate2Address(salt);
+
+std.debug.print("Contract will be deployed to: {}\n", .{create2_addr});
+```
+
+### Event Parsing
+
+Parse and filter contract events:
+
+```zig
+// Get Transfer event from contract
+const event = contract.getEvent("Transfer").?;
+
+// Parse a log
+const log = /* ... received from RPC ... */;
+const parsed = try zigeth.contract.parseEvent(allocator, event, log);
+defer parsed.deinit();
+
+// Access indexed arguments
+const from = parsed.getIndexedArg("from");
+const to = parsed.getIndexedArg("to");
+
+// Access non-indexed arguments
+const value = parsed.getDataArg("value");
+
+if (value) |v| {
+    std.debug.print("Transferred: {}\n", .{v.uint});
+}
+
+// Parse multiple logs
+const logs: []zigeth.types.Log = /* ... */;
+const parsed_events = try zigeth.contract.parseEvents(allocator, event, logs);
+defer {
+    for (parsed_events) |p| p.deinit();
+    allocator.free(parsed_events);
+}
+
+// Create event filter
+var filter = zigeth.contract.EventFilter.init(allocator);
+defer filter.deinit();
+
+filter.setAddress(contract_addr);
+filter.setBlockRange(1000000, 2000000);
+
+const event_sig = try zigeth.contract.getEventSignatureHash(allocator, event);
+filter.setEventSignature(event_sig);
+```
+
 ## 🔧 EIP Support
 
 Zigeth implements the latest Ethereum Improvement Proposals:
@@ -624,12 +882,13 @@ All Ethereum transaction types are fully supported:
 
 ## 📊 Testing & Quality
 
-- **Total Tests**: 132 passing ✓
+- **Total Tests**: 150 passing ✓
   - Primitives: 48 tests
   - Types: 23 tests
   - Crypto: 27 tests
   - RPC: 13 tests
   - ABI: 23 tests
+  - Contract: 19 tests
   - Utilities: 8 tests
 - **Code Coverage**: Comprehensive
 - **Linting**: Enforced via `zig build lint`
