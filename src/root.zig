@@ -90,6 +90,11 @@ pub const rlp = struct {
 pub const providers = struct {
     pub const Provider = @import("providers/provider.zig").Provider;
     pub const HttpProvider = @import("providers/http.zig").HttpProvider;
+    pub const WsProvider = @import("providers/ws.zig").WsProvider;
+    pub const IpcProvider = @import("providers/ipc.zig").IpcProvider;
+    pub const MockProvider = @import("providers/mock.zig").MockProvider;
+    pub const Networks = @import("providers/http.zig").Networks;
+    pub const SocketPaths = @import("providers/ipc.zig").SocketPaths;
 };
 
 pub const rpc = struct {
