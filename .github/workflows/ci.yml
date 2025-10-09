@@ -22,6 +22,9 @@ jobs:
         with:
           version: 0.14.1
 
+      - name: Create cache directory
+        run: mkdir -p .zig-cache/global
+
       - name: Check formatting
         run: zig build fmt-check
 
@@ -47,6 +50,15 @@ jobs:
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.14.1
+
+      - name: Create cache directories (Unix)
+        if: runner.os != 'Windows'
+        run: mkdir -p .zig-cache/global
+
+      - name: Create cache directories (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: New-Item -Path ".zig-cache/global" -ItemType Directory -Force
 
       - name: Cache Zig artifacts
         uses: actions/cache@v4
@@ -86,6 +98,15 @@ jobs:
         with:
           version: 0.14.1
 
+      - name: Create cache directories (Unix)
+        if: runner.os != 'Windows'
+        run: mkdir -p .zig-cache/global
+
+      - name: Create cache directories (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: New-Item -Path ".zig-cache/global" -ItemType Directory -Force
+
       - name: Cache Zig artifacts
         uses: actions/cache@v4
         with:
@@ -115,6 +136,9 @@ jobs:
         with:
           version: 0.14.1
 
+      - name: Create cache directory
+        run: mkdir -p .zig-cache/global
+
       - name: Run tests with coverage
         run: zig build test
 
@@ -137,6 +161,9 @@ jobs:
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.14.1
+
+      - name: Create cache directory
+        run: mkdir -p .zig-cache/global
 
       - name: Build documentation
         run: zig build docs
