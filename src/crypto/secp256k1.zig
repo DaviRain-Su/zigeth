@@ -4,6 +4,7 @@ const Hash = @import("../primitives/hash.zig").Hash;
 const Signature = @import("../primitives/signature.zig").Signature;
 const U256 = @import("../primitives/uint.zig").U256;
 const keccak = @import("./keccak.zig");
+const secp = @import("secp256k1");
 
 /// secp256k1 curve parameters
 pub const Secp256k1 = struct {
@@ -129,46 +130,58 @@ pub const PublicKey = struct {
 };
 
 /// Derive public key from private key
-/// Note: This is a placeholder. In production, use libsecp256k1 or a proper EC implementation
 pub fn derivePublicKey(private_key: PrivateKey) !PublicKey {
-    // TODO: Implement proper scalar multiplication on secp256k1
-    // For now, return a placeholder
-    // In production, this would use: public_key = private_key * G
+    var ctx = try secp.Secp256k1.init();
 
-    _ = private_key;
-    return error.NotImplemented;
+    // Use a workaround: sign a dummy message and recover the pubkey
+    // This gives us the public key corresponding to the private key
+    const dummy_msg: [32]u8 = [_]u8{1} ** 32;
+    const dummy_sig = try ctx.sign(dummy_msg, private_key.bytes);
+    const pubkey_65 = try ctx.recoverPubkey(dummy_msg, dummy_sig);
+
+    // Convert from 65-byte (0x04 prefix + x + y) to our format (x + y)
+    return try PublicKey.fromUncompressed(pubkey_65[1..65]);
 }
 
 /// Sign a message hash with a private key
-/// Note: This is a placeholder. In production, use libsecp256k1
 pub fn sign(message_hash: Hash, private_key: PrivateKey) !Signature {
-    // TODO: Implement proper ECDSA signing
-    // For now, return a placeholder
+    var ctx = try secp.Secp256k1.init();
+    const sig_bytes = try ctx.sign(message_hash.bytes, private_key.bytes);
 
-    _ = message_hash;
-    _ = private_key;
-    return error.NotImplemented;
+    // sig_bytes is [65]u8: [r (32) | s (32) | v (1)]
+    var sig: Signature = undefined;
+    @memcpy(&sig.r, sig_bytes[0..32]);
+    @memcpy(&sig.s, sig_bytes[32..64]);
+    // Convert recovery ID (0-3) to Ethereum v (27-30)
+    sig.v = sig_bytes[64] + 27;
+
+    return sig;
 }
 
 /// Verify a signature
-/// Note: This is a placeholder. In production, use libsecp256k1
 pub fn verify(message_hash: Hash, signature: Signature, public_key: PublicKey) !bool {
-    // TODO: Implement proper ECDSA verification
+    // For verification, we can recover the public key and compare
+    const recovered_pubkey = try recoverPublicKey(message_hash, signature);
 
-    _ = message_hash;
-    _ = signature;
-    _ = public_key;
-    return error.NotImplemented;
+    return std.mem.eql(u8, &public_key.x, &recovered_pubkey.x) and
+        std.mem.eql(u8, &public_key.y, &recovered_pubkey.y);
 }
 
 /// Recover public key from signature and message hash
-/// Note: This is a placeholder. In production, use libsecp256k1
 pub fn recoverPublicKey(message_hash: Hash, signature: Signature) !PublicKey {
-    // TODO: Implement public key recovery from signature
+    var ctx = try secp.Secp256k1.init();
 
-    _ = message_hash;
-    _ = signature;
-    return error.NotImplemented;
+    // Convert our signature format to library format
+    var sig_bytes: [65]u8 = undefined;
+    @memcpy(sig_bytes[0..32], &signature.r);
+    @memcpy(sig_bytes[32..64], &signature.s);
+    // Convert Ethereum v (27-30) back to recovery ID (0-3)
+    sig_bytes[64] = signature.v - 27;
+
+    const pubkey_65 = try ctx.recoverPubkey(message_hash.bytes, sig_bytes);
+
+    // Convert from 65-byte (0x04 prefix + x + y) to our format (x + y)
+    return try PublicKey.fromUncompressed(pubkey_65[1..65]);
 }
 
 test "private key validation" {
@@ -246,4 +259,81 @@ test "public key compressed format" {
 
     try std.testing.expectEqual(@as(usize, 33), compressed_odd.len);
     try std.testing.expectEqual(@as(u8, 0x03), compressed_odd[0]);
+}
+
+test "derive public key from private key" {
+    var prng = std.rand.DefaultPrng.init(12345);
+    const random = prng.random();
+
+    const private_key = try PrivateKey.generate(random);
+    const public_key = try derivePublicKey(private_key);
+
+    // Public key should not be all zeros
+    const x_zero = std.mem.allEqual(u8, &public_key.x, 0);
+    const y_zero = std.mem.allEqual(u8, &public_key.y, 0);
+    try std.testing.expect(!x_zero or !y_zero);
+}
+
+test "sign and verify" {
+    var prng = std.rand.DefaultPrng.init(54321);
+    const random = prng.random();
+
+    // Generate a private key
+    const private_key = try PrivateKey.generate(random);
+
+    // Derive public key
+    const public_key = try derivePublicKey(private_key);
+
+    // Create a message hash
+    const message = "Hello, Ethereum!";
+    const message_hash = keccak.hash(message);
+
+    // Sign the message
+    const signature = try sign(message_hash, private_key);
+
+    // Verify the signature
+    const is_valid = try verify(message_hash, signature, public_key);
+    try std.testing.expect(is_valid);
+}
+
+test "recover public key from signature" {
+    var prng = std.rand.DefaultPrng.init(98765);
+    const random = prng.random();
+
+    // Generate a private key
+    const private_key = try PrivateKey.generate(random);
+
+    // Derive public key
+    const original_pubkey = try derivePublicKey(private_key);
+
+    // Create a message hash
+    const message = "Test recovery";
+    const message_hash = keccak.hash(message);
+
+    // Sign the message
+    const signature = try sign(message_hash, private_key);
+
+    // Recover public key from signature
+    const recovered_pubkey = try recoverPublicKey(message_hash, signature);
+
+    // Compare the public keys
+    try std.testing.expect(std.mem.eql(u8, &original_pubkey.x, &recovered_pubkey.x));
+    try std.testing.expect(std.mem.eql(u8, &original_pubkey.y, &recovered_pubkey.y));
+}
+
+test "address derivation from keypair" {
+    var prng = std.rand.DefaultPrng.init(11111);
+    const random = prng.random();
+
+    // Generate a private key
+    const private_key = try PrivateKey.generate(random);
+
+    // Derive public key
+    const public_key = try derivePublicKey(private_key);
+
+    // Derive address
+    const address = public_key.toAddress();
+
+    // Address should not be zero
+    try std.testing.expect(!address.isZero());
 }

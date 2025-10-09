@@ -1,52 +1,24 @@
 .{
     .name = .zigeth,
-    
+
     // Semantic version
     .version = "0.1.0",
-    
+
     // Unique package identifier
     // DO NOT change this unless forking the project
     .fingerprint = 0x6f8e09d114966ae6,
-    
+
     // Minimum Zig version required
     .minimum_zig_version = "0.14.1",
-    
+
     // Dependencies
     // To add a new dependency, use: zig fetch --save <url>
     .dependencies = .{
-        // Cryptographic primitives
-        // Uncomment and add actual URLs when available
-        // .@"zig-crypto" = .{
-        //     .url = "https://github.com/example/zig-crypto/archive/main.tar.gz",
-        //     .hash = "1220...", // Run `zig build` to get the hash
-        // },
-        
-        // HTTP client for JSON-RPC
-        // .@"zig-http" = .{
-        //     .url = "https://github.com/example/zig-http/archive/main.tar.gz",
-        //     .hash = "1220...",
-        // },
-        
-        // WebSocket support
-        // .@"zig-websocket" = .{
-        //     .url = "https://github.com/example/zig-websocket/archive/main.tar.gz",
-        //     .hash = "1220...",
-        // },
-        
-        // Big integer arithmetic
-        // .@"zig-bigint" = .{
-        //     .url = "https://github.com/example/zig-bigint/archive/main.tar.gz",
-        //     .hash = "1220...",
-        // },
-        
-        // secp256k1 bindings
-        // .secp256k1 = .{
-        //     .url = "https://github.com/example/zig-secp256k1/archive/main.tar.gz",
-        //     .hash = "1220...",
-        // },
+        .zig_eth_secp256k1 = .{
+            .url = "https://github.com/jsign/zig-eth-secp256k1/archive/refs/heads/main.tar.gz",
+            .hash = "zig_eth_secp256k1-0.1.0-_U97sGzoDACkTnLX6ggeDfs_MhZHyxapYfhPPAtoQJJG",
+        },
     },
-    
-    // Files included in this package
     .paths = .{
         "build.zig",
         "build.zig.zon",

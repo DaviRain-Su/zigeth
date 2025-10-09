@@ -8,6 +8,12 @@ pub fn build(b: *std.Build) void {
     const enable_benchmarks = b.option(bool, "benchmarks", "Build benchmarks") orelse false;
     const enable_examples = b.option(bool, "examples", "Build examples") orelse false;
 
+    // Get zig-eth-secp256k1 dependency
+    const secp256k1_dep = b.dependency("zig_eth_secp256k1", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     // Create the main library module
     const zigeth_mod = b.addModule("zigeth", .{
         .root_source_file = b.path("src/root.zig"),
@@ -15,13 +21,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Add dependencies to the module if they exist
-    // Uncomment these as you add the actual dependencies
-    // const crypto_dep = b.dependency("zig-crypto", .{
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // zigeth_mod.addImport("crypto", crypto_dep.module("crypto"));
+    // Add secp256k1 dependency to module
+    zigeth_mod.addImport("secp256k1", secp256k1_dep.module("zig-eth-secp256k1"));
 
     // Build static library
     const lib = b.addStaticLibrary(.{
