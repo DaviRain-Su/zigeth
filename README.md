@@ -1,6 +1,6 @@
 # Zigeth
 
-[![CI](https://github.com/yourusername/zigeth/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/zigeth/actions/workflows/ci.yml)
+[![CI](https://github.com/ch4r10t33r/zigeth/actions/workflows/ci.yml/badge.svg)](https://github.com/ch4r10t33r/zigeth/actions/workflows/ci.yml)
 [![Zig](https://img.shields.io/badge/Zig-0.14.1-orange.svg)](https://ziglang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -175,7 +175,7 @@ Add zigeth to your project's `build.zig.zon`:
 ```zig
 .dependencies = .{
     .zigeth = .{
-        .url = "https://github.com/yourusername/zigeth/archive/main.tar.gz",
+        .url = "https://github.com/ch4r10t33r/zigeth/archive/main.tar.gz",
         .hash = "...", // Run `zig build` to get the hash
     },
 },
