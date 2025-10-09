@@ -80,7 +80,7 @@ pub fn main() !void {
 
         std.debug.print("   Gas used: {d}\n", .{gas_used});
         std.debug.print("   Gas price: 50 gwei\n", .{});
-        std.debug.print("   Total fee: {} wei\n", .{fee});
+        std.debug.print("   Total fee: {d} wei\n", .{fee});
 
         // Convert to ETH (simple cast since we know it's a small value)
         const fee_u64: u64 = @intCast(fee); // Safe cast for this example

@@ -55,7 +55,7 @@ pub fn main() !void {
         defer allocator.free(addr_hex);
 
         std.debug.print("✅ Address: {s}\n", .{addr_hex});
-        std.debug.print("   Balance: {} wei\n", .{balance});
+        std.debug.print("   Balance: {d} wei\n", .{balance});
 
         // Convert to ether
         const ether = try zigeth.utils.units.weiToEther(balance);
@@ -68,7 +68,7 @@ pub fn main() !void {
     {
         const gas_price = try provider.getGasPrice();
 
-        std.debug.print("✅ Gas price: {} wei\n", .{gas_price});
+        std.debug.print("✅ Gas price: {d} wei\n", .{gas_price});
 
         // Convert to gwei
         const gas_u64: u64 = @intCast(gas_price / 1_000_000_000);
@@ -94,7 +94,7 @@ pub fn main() !void {
         std.debug.print("   Transactions: {d}\n", .{block.transactions.len});
 
         if (block.header.base_fee_per_gas) |base_fee| {
-            std.debug.print("   Base fee: {} wei\n", .{base_fee});
+            std.debug.print("   Base fee: {d} wei\n", .{base_fee});
         }
         std.debug.print("\n", .{});
     }

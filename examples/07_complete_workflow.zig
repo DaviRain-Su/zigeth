@@ -233,11 +233,11 @@ pub fn main() !void {
         std.debug.print("   if (receipt.isSuccess()) {{\n", .{});
         std.debug.print("       std.debug.print(\"✅ Transaction successful!\\n\", .{{}});\n", .{});
         std.debug.print("       std.debug.print(\"   Block: {{}}\\n\", .{{receipt.block_number}});\n", .{});
-        std.debug.print("       std.debug.print(\"   Gas used: {{}}\\n\", .{{receipt.gas_used}});\n\n", .{});
+        std.debug.print("       std.debug.print(\"   Gas used: {{d}}\\n\", .{{receipt.gas_used}});\n\n", .{});
 
         std.debug.print("       // Calculate fee\n", .{});
         std.debug.print("       const fee = receipt.calculateFee();\n", .{});
-        std.debug.print("       std.debug.print(\"   Fee: {{}} wei\\n\", .{{fee}});\n\n", .{});
+        std.debug.print("       std.debug.print(\"   Fee: {{d}} wei\\n\", .{{fee}});\n\n", .{});
 
         std.debug.print("       // Remove from pending\n", .{});
         std.debug.print("       nonce.removePendingTx(tx.from, tx.nonce);\n", .{});

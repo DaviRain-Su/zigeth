@@ -1,7 +1,6 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
 
 /// JSON-RPC request
 pub const JsonRpcRequest = struct {
@@ -77,8 +76,8 @@ pub const CallParams = struct {
     from: ?Address = null,
     to: ?Address,
     gas: ?u64 = null,
-    gas_price: ?U256 = null,
-    value: ?U256 = null,
+    gas_price: ?u256 = null,
+    value: ?u256 = null,
     data: ?[]const u8 = null,
 };
 
@@ -87,15 +86,15 @@ pub const TransactionParams = struct {
     from: Address,
     to: ?Address,
     gas: ?u64 = null,
-    gas_price: ?U256 = null,
-    value: ?U256 = null,
+    gas_price: ?u256 = null,
+    value: ?u256 = null,
     data: ?[]const u8 = null,
     nonce: ?u64 = null,
     chain_id: ?u64 = null,
 
     // EIP-1559 fields
-    max_fee_per_gas: ?U256 = null,
-    max_priority_fee_per_gas: ?U256 = null,
+    max_fee_per_gas: ?u256 = null,
+    max_priority_fee_per_gas: ?u256 = null,
 };
 
 /// Filter options for eth_getLogs
@@ -118,9 +117,9 @@ pub const SubscriptionParams = union(enum) {
 /// Fee history result
 pub const FeeHistory = struct {
     oldest_block: u64,
-    base_fee_per_gas: []U256,
+    base_fee_per_gas: []u256,
     gas_used_ratio: []f64,
-    reward: ?[][]U256 = null,
+    reward: ?[][]u256 = null,
     allocator: std.mem.Allocator,
 
     pub fn deinit(self: FeeHistory) void {
@@ -172,7 +171,7 @@ pub const PeerInfo = struct {
 
     pub const EthProtocol = struct {
         version: u64,
-        difficulty: U256,
+        difficulty: u256,
         head: Hash,
     };
 

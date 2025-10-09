@@ -61,9 +61,9 @@ pub fn main() !void {
 
         std.debug.print("✅ Created legacy transaction\n", .{});
         std.debug.print("   To: {any}\n", .{tx.to.?});
-        std.debug.print("   Value: {} wei\n", .{tx.value});
+        std.debug.print("   Value: {d} wei\n", .{tx.value});
         std.debug.print("   Gas limit: {d}\n", .{tx.gas_limit});
-        std.debug.print("   Gas price: {?} wei\n\n", .{tx.gas_price});
+        std.debug.print("   Gas price: {d} wei\n\n", .{tx.gas_price.?});
     }
 
     // Example 2: Create EIP-1559 transaction
@@ -90,8 +90,8 @@ pub fn main() !void {
 
         std.debug.print("✅ Created EIP-1559 transaction\n", .{});
         std.debug.print("   Type: EIP-1559\n", .{});
-        std.debug.print("   Max fee: {?} wei\n", .{tx.max_fee_per_gas});
-        std.debug.print("   Priority fee: {?} wei\n\n", .{tx.max_priority_fee_per_gas});
+        std.debug.print("   Max fee: {d} wei\n", .{tx.max_fee_per_gas.?});
+        std.debug.print("   Priority fee: {d} wei\n\n", .{tx.max_priority_fee_per_gas.?});
     }
 
     // Example 3: Using Middleware for Automatic Gas & Nonce
@@ -139,7 +139,7 @@ pub fn main() !void {
         std.debug.print("✅ Transaction configured with middleware\n", .{});
         std.debug.print("   Nonce: {d} (auto-managed)\n", .{tx.nonce});
         std.debug.print("   Gas limit: {d}\n", .{tx.gas_limit});
-        std.debug.print("   Max fee: {?}\n", .{tx.max_fee_per_gas});
+        std.debug.print("   Max fee: {any}\n", .{tx.max_fee_per_gas});
 
         // Check if we have sufficient balance
         const has_balance = try gas_middleware.checkSufficientBalance(
