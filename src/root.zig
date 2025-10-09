@@ -95,7 +95,22 @@ pub const rpc = struct {
     pub const FilterOptions = rpc_types.FilterOptions;
 };
 
-pub const contract = @import("contract/contract.zig");
+pub const contract = struct {
+    pub const Contract = @import("contract/contract.zig").Contract;
+    pub const CallBuilder = @import("contract/call.zig").CallBuilder;
+    pub const CallParams = @import("contract/call.zig").CallParams;
+    pub const CallResult = @import("contract/call.zig").CallResult;
+    pub const callView = @import("contract/call.zig").callView;
+    pub const callMutating = @import("contract/call.zig").callMutating;
+    pub const DeployBuilder = @import("contract/deploy.zig").DeployBuilder;
+    pub const DeployReceipt = @import("contract/deploy.zig").DeployReceipt;
+    pub const ParsedEvent = @import("contract/event.zig").ParsedEvent;
+    pub const EventFilter = @import("contract/event.zig").EventFilter;
+    pub const parseEvent = @import("contract/event.zig").parseEvent;
+    pub const parseEvents = @import("contract/event.zig").parseEvents;
+    pub const getEventSignatureHash = @import("contract/event.zig").getEventSignatureHash;
+};
+
 pub const signer = @import("signer/wallet.zig");
 
 pub const utils = struct {
