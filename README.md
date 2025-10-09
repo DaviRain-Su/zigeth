@@ -19,22 +19,20 @@ A comprehensive Ethereum library for Zig, providing complete cryptographic primi
 | **📝 Contract** | ✅ **Production Ready** | ████████████████████ 100% | 19/19 | Calls, Deploy, Events, CREATE2 |
 | **🌐 RPC** | ✅ **Production Ready** | ████████████████████ 100% | 27/27 | Full HTTP client, eth/net/web3/debug |
 | **📜 RLP** | ✅ **Production Ready** | ████████████████████ 100% | 36/36 | Encoding, Decoding, Ethereum types |
-| **🔌 Providers** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | HTTP, WebSocket, IPC |
-| **🔑 Wallet** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Software wallet, Keystore |
-| **⚙️ Middleware** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Gas, Nonce, Signing |
-| **🌍 Networks** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Pre-configured networks |
+| **🔌 Providers** | ✅ **Production Ready** | ████████████████████ 100% | 23/23 | HTTP, WebSocket, IPC, Mock, Networks |
 | **🧰 Utils** | ✅ **Production Ready** | ████████████████████ 100% | 35/35 | Hex, Format, Units, Checksum (EIP-55/1191) |
 | **⚡ Solidity** | ✅ **Production Ready** | ████████████████████ 100% | 15/15 | Type mappings, Standard interfaces, Helpers |
-| **🔌 Providers** | ✅ **Production Ready** | ████████████████████ 100% | 16/16 | HTTP, WebSocket, IPC, Mock, Networks |
+| **🔑 Wallet** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Software wallet, Keystore |
+| **⚙️ Middleware** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Gas, Nonce, Signing |
 
 ### Overall Progress
-**Total**: 258/258 tests passing ✅ | **75% Complete** | **10/12 modules production-ready**
+**Total**: 276/276 tests passing ✅ | **83% Complete** | **10/12 modules production-ready**
 
 **Legend**: ✅ Production Ready | 🚧 In Progress | ⏳ Planned
 
 ---
 
-**Current Status**: 258 tests passing | 75% complete | Production-ready crypto, ABI, primitives, contracts, RLP, RPC, Solidity, Providers & utilities
+**Current Status**: 276 tests passing | 83% complete | Production-ready crypto, ABI, primitives, contracts, RLP, RPC, Solidity, full Providers (HTTP/WS/IPC) & utilities
 
 ## 🏗️ Architecture
 
@@ -235,11 +233,19 @@ zigeth/
   - Type introspection (isDynamic, bitSize, byteSize)
   - Quick contract creation helpers (Erc20Contract, Erc721Contract)
 
-- **🔌 Network Providers** (5 modules, 16 tests):
+- **🔌 Network Providers** (5 modules, 23 tests):
   - Base `Provider` interface with unified API
-  - `HttpProvider` - HTTP/HTTPS provider with Etherspot RPC endpoints
-  - `WsProvider` - WebSocket provider with subscriptions (framework)
-  - `IpcProvider` - Unix socket provider for local nodes
+  - `HttpProvider` - HTTP/HTTPS provider with Etherspot RPC v2 endpoints
+  - `WsProvider` - WebSocket provider with real-time subscriptions (full implementation)
+    - Connection management (connect, disconnect, isConnected)
+    - Subscription management (newHeads, pendingTransactions, logs, syncing)
+    - Message sending/receiving over WebSocket
+    - JSON-RPC request/response handling
+  - `IpcProvider` - Unix socket provider for local nodes (full implementation)
+    - Unix socket connection support
+    - Platform-specific socket paths (Linux, macOS, Windows)
+    - Direct JSON-RPC communication over IPC
+    - Stream access for advanced use cases
   - `MockProvider` - Testing provider with configurable responses
   - Common helper methods (getBalance, getBlockNumber, waitForTransaction)
   - Etherspot network presets (mainnet, sepolia, polygon, arbitrum, optimism, base, localhost)
@@ -1483,7 +1489,7 @@ defer allocator.free(code);
 
 ### WebSocket Provider
 
-Real-time subscriptions (framework ready):
+Real-time subscriptions (full implementation):
 
 ```zig
 // Connect via WebSocket
@@ -1493,7 +1499,11 @@ var ws_provider = try zigeth.providers.WsProvider.init(
 );
 defer ws_provider.deinit();
 
-// Subscribe to new blocks
+// Establish WebSocket connection
+try ws_provider.connect();
+defer ws_provider.disconnect();
+
+// Subscribe to new blocks (real-time block headers)
 const sub_id = try ws_provider.subscribeNewHeads();
 defer allocator.free(sub_id);
 
@@ -1505,16 +1515,32 @@ defer allocator.free(pending_sub);
 const log_sub = try ws_provider.subscribeLogs(filter_options);
 defer allocator.free(log_sub);
 
-// Unsubscribe
+// Subscribe to sync status updates
+const sync_sub = try ws_provider.subscribeSyncing();
+defer allocator.free(sync_sub);
+
+// Unsubscribe from subscription
 try ws_provider.unsubscribe(sub_id);
 
 // Check connection status
 const connected = ws_provider.isConnected();
+
+// Receive real-time messages
+const message = try ws_provider.receiveMessage();
+defer allocator.free(message);
+
+// Send custom JSON-RPC request
+const request = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}";
+const response = try ws_provider.sendRequest(request);
+defer allocator.free(response);
+
+// Get subscription count
+const sub_count = ws_provider.getSubscriptionCount();
 ```
 
 ### IPC Provider
 
-Connect to local node via Unix socket:
+Connect to local node via Unix socket (full implementation):
 
 ```zig
 // Connect to local Geth node
@@ -1533,16 +1559,27 @@ var auto_provider = try zigeth.providers.IpcProvider.init(
 defer auto_provider.deinit();
 
 // Platform-specific paths
-const geth_unix = zigeth.providers.SocketPaths.GETH_UNIX;
-const geth_macos = zigeth.providers.SocketPaths.GETH_MACOS;
-const geth_windows = zigeth.providers.SocketPaths.GETH_WINDOWS;
+const geth_unix = zigeth.providers.SocketPaths.GETH_UNIX;      // /tmp/geth.ipc
+const geth_macos = zigeth.providers.SocketPaths.GETH_MACOS;    // ~/Library/Ethereum/geth.ipc
+const geth_windows = zigeth.providers.SocketPaths.GETH_WINDOWS; // \\.\pipe\geth.ipc
 
-// Connect/disconnect
+// Connect to Unix socket
 try ipc_provider.connect();
 defer ipc_provider.disconnect();
 
-// Check connection
+// Check connection status
 const connected = ipc_provider.isConnected();
+
+// Send JSON-RPC request directly
+const request = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}";
+const response = try ipc_provider.sendRequest(request);
+defer allocator.free(response);
+
+// Access underlying stream for advanced use
+if (ipc_provider.getStream()) |stream| {
+    // Direct stream access for custom protocols
+    _ = try stream.write("custom data");
+}
 ```
 
 ### Mock Provider
