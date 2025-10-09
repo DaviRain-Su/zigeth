@@ -129,6 +129,27 @@ pub const contract = struct {
     pub const getEventSignatureHash = @import("contract/event.zig").getEventSignatureHash;
 };
 
+pub const sol = struct {
+    pub const sol_types = @import("sol/types.zig");
+    pub const macros = @import("sol/macros.zig");
+
+    // Re-export commonly used types
+    pub const SolidityType = sol_types.SolidityType;
+    pub const SolidityValue = sol_types.SolidityValue;
+    pub const StandardInterface = sol_types.StandardInterface;
+    pub const parseType = sol_types.parseType;
+    pub const ContractBinding = macros.ContractBinding;
+    pub const FunctionCall = macros.FunctionCall;
+    pub const EventFilter = macros.EventFilter;
+    pub const Erc20Contract = macros.Erc20Contract;
+    pub const Erc721Contract = macros.Erc721Contract;
+    pub const Erc1155Contract = macros.Erc1155Contract;
+    pub const AbiParser = macros.AbiParser;
+    pub const ParsedAbi = macros.ParsedAbi;
+    pub const Selectors = macros.Selectors;
+    pub const ValueConversion = macros.ValueConversion;
+};
+
 pub const signer = @import("signer/wallet.zig");
 
 pub const utils = struct {

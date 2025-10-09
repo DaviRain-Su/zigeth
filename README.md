@@ -24,15 +24,16 @@ A comprehensive Ethereum library for Zig, providing complete cryptographic primi
 | **⚙️ Middleware** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Gas, Nonce, Signing |
 | **🌍 Networks** | ⏳ **Planned** | ░░░░░░░░░░░░░░░░░░░░ 0% | 0/0 | Pre-configured networks |
 | **🧰 Utils** | ✅ **Production Ready** | ████████████████████ 100% | 35/35 | Hex, Format, Units, Checksum (EIP-55/1191) |
+| **⚡ Solidity** | ✅ **Production Ready** | ████████████████████ 100% | 15/15 | Type mappings, Standard interfaces, Helpers |
 
 ### Overall Progress
-**Total**: 227/227 tests passing ✅ | **65% Complete** | **8/12 modules production-ready**
+**Total**: 242/242 tests passing ✅ | **70% Complete** | **9/12 modules production-ready**
 
 **Legend**: ✅ Production Ready | 🚧 In Progress | ⏳ Planned
 
 ---
 
-**Current Status**: 227 tests passing | 65% complete | Production-ready crypto, ABI, primitives, contracts, RLP, RPC & utilities
+**Current Status**: 242 tests passing | 70% complete | Production-ready crypto, ABI, primitives, contracts, RLP, RPC, Solidity & utilities
 
 ## 🏗️ Architecture
 
@@ -110,9 +111,9 @@ zigeth/
 │   │   ├── chain.zig         # Chain parameters
 │   │   └── networks.zig      # Pre-configured networks
 │   │
-│   ├── sol/                  # Solidity integration (TODO)
-│   │   ├── types.zig         # Solidity type mappings
-│   │   └── macros.zig        # Code generation macros
+│   ├── sol/                  # Solidity integration ✅ IMPLEMENTED
+│   │   ├── types.zig         # Solidity type mappings ✅
+│   │   └── macros.zig        # Code generation helpers ✅
 │   │
 │   └── utils/                # Utility functions ✅ IMPLEMENTED
 │       ├── hex.zig           # Hex encoding/decoding ✅
@@ -219,6 +220,19 @@ zigeth/
   - Transaction encoding helpers
   - Full decode support with type-safe values
   - Roundtrip encoding/decoding verification
+
+- **⚡ Solidity Integration** (2 modules, 15 tests):
+  - Complete Solidity type to Zig type mappings
+  - Standard interface definitions (ERC-20, ERC-721, ERC-1155)
+  - OpenZeppelin pattern support (Ownable, Pausable, AccessControl)
+  - Contract binding code generation
+  - Function call builders
+  - Event filter helpers
+  - Pre-defined function selectors (ERC-20, ERC-721)
+  - Pre-defined event signatures
+  - Value conversion helpers (Zig ↔ ABI)
+  - Type introspection (isDynamic, bitSize, byteSize)
+  - Quick contract creation helpers (Erc20Contract, Erc721Contract)
 
 ### 🚧 **Planned Features**
 
@@ -1215,6 +1229,153 @@ The RLP encoding follows the Ethereum Yellow Paper specification:
 4. **List 0-55 bytes payload**: `[0xc0 + payload_length, ...encoded_items]`
 5. **List > 55 bytes payload**: `[0xf7 + length_of_length, ...length_bytes, ...encoded_items]`
 
+## ⚡ Solidity Integration
+
+Zigeth provides first-class support for Solidity contracts with type mappings and standard interface definitions.
+
+### Standard Interfaces
+
+Quick contract creation for common standards:
+
+```zig
+const zigeth = @import("zigeth");
+
+// Create ERC-20 token contract
+const usdc_addr = try zigeth.primitives.Address.fromHex("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+const usdc = try zigeth.sol.Erc20Contract(allocator, usdc_addr);
+defer usdc.deinit();
+
+// Contract has all ERC-20 methods ready
+const balance_args = [_]zigeth.abi.AbiValue{
+    .{ .address = my_address },
+};
+const call_data = try usdc.encodeCall("balanceOf", &balance_args);
+defer allocator.free(call_data);
+
+// Create ERC-721 NFT contract
+const bayc_addr = try zigeth.primitives.Address.fromHex("0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D");
+const bayc = try zigeth.sol.Erc721Contract(allocator, bayc_addr);
+defer bayc.deinit();
+
+// Query NFT owner
+const owner_args = [_]zigeth.abi.AbiValue{
+    .{ .uint = zigeth.primitives.U256.fromInt(1234) }, // tokenId
+};
+const owner_call = try bayc.encodeCall("ownerOf", &owner_args);
+defer allocator.free(owner_call);
+
+// Create ERC-1155 multi-token contract
+const erc1155 = try zigeth.sol.Erc1155Contract(allocator, contract_addr);
+defer erc1155.deinit();
+```
+
+### Type Mappings
+
+Map between Solidity and Zig types:
+
+```zig
+const zigeth = @import("zigeth");
+
+// Parse Solidity type strings
+const sol_type = try zigeth.sol.parseType("uint256");
+const abi_type = sol_type.toAbiType();
+
+// Check type properties
+const is_uint = sol_type.isUint(); // true
+const is_dynamic = sol_type.isDynamic(); // false
+const bits = sol_type.bitSize(); // 256
+const bytes = sol_type.byteSize(); // 32
+const name = sol_type.typeName(); // "uint256"
+
+// Supported types:
+// - address, bool, string, bytes
+// - uint8, uint16, uint32, uint64, uint128, uint256
+// - int8, int16, int32, int64, int128, int256
+// - bytes1, bytes2, bytes4, bytes8, bytes16, bytes32
+```
+
+### Value Conversion
+
+Convert Zig values to ABI values:
+
+```zig
+// Convert primitive types
+const uint_val = zigeth.sol.ValueConversion.toAbiValue(u64, 1000);
+// Result: AbiValue{ .uint = U256.fromInt(1000) }
+
+const bool_val = zigeth.sol.ValueConversion.toAbiValue(bool, true);
+// Result: AbiValue{ .bool_val = true }
+
+// Convert Address
+const addr_val = zigeth.sol.ValueConversion.addressToAbiValue(address);
+// Result: AbiValue{ .address = address }
+
+// Convert U256
+const u256_val = zigeth.sol.ValueConversion.u256ToAbiValue(value);
+// Result: AbiValue{ .uint = value }
+```
+
+### Pre-defined Selectors
+
+Use pre-computed function selectors:
+
+```zig
+const zigeth = @import("zigeth");
+
+// ERC-20 selectors
+const transfer_sel = zigeth.sol.Selectors.ERC20_TRANSFER; // "0xa9059cbb"
+const approve_sel = zigeth.sol.Selectors.ERC20_APPROVE; // "0x095ea7b3"
+const balance_sel = zigeth.sol.Selectors.ERC20_BALANCE_OF; // "0x70a08231"
+
+// ERC-721 selectors
+const owner_sel = zigeth.sol.Selectors.ERC721_OWNER_OF; // "0x6352211e"
+const transfer_from_sel = zigeth.sol.Selectors.ERC721_TRANSFER_FROM;
+
+// Event signatures (topic0)
+const transfer_event = zigeth.sol.Selectors.TRANSFER_EVENT;
+const approval_event = zigeth.sol.Selectors.APPROVAL_EVENT;
+```
+
+### Custom Contract Binding
+
+Generate type-safe contract bindings:
+
+```zig
+const MyContractBinding = zigeth.sol.ContractBinding(
+    "MyContract",
+    &my_functions,
+    &my_events,
+);
+
+const contract = try MyContractBinding.init(allocator, contract_addr);
+defer contract.deinit();
+
+std.debug.print("Contract: {s}\n", .{MyContractBinding.getName()});
+std.debug.print("Address: {}\n", .{contract.getAddress()});
+```
+
+### Standard Interfaces
+
+Get functions and events for standard interfaces:
+
+```zig
+// ERC-20 interface
+const erc20_functions = try zigeth.sol.StandardInterface.erc20.getFunctions(allocator);
+defer allocator.free(erc20_functions);
+// Returns: totalSupply, balanceOf, transfer, allowance, approve, transferFrom
+
+const erc20_events = try zigeth.sol.StandardInterface.erc20.getEvents(allocator);
+defer allocator.free(erc20_events);
+// Returns: Transfer, Approval
+
+// ERC-721 interface
+const erc721_functions = try zigeth.sol.StandardInterface.erc721.getFunctions(allocator);
+defer allocator.free(erc721_functions);
+// Returns: balanceOf, ownerOf, transferFrom, approve, setApprovalForAll, getApproved
+
+// Also supports: ERC-1155, Ownable, Pausable, AccessControl
+```
+
 ## 🔧 EIP Support
 
 Zigeth implements the latest Ethereum Improvement Proposals:
@@ -1253,7 +1414,7 @@ All Ethereum transaction types are fully supported:
 
 ## 📊 Testing & Quality
 
-- **Total Tests**: 227 passing ✓
+- **Total Tests**: 242 passing ✓
   - Primitives: 48 tests
   - Types: 23 tests
   - Crypto: 27 tests
@@ -1261,6 +1422,7 @@ All Ethereum transaction types are fully supported:
   - ABI: 23 tests
   - Contract: 19 tests
   - RLP: 36 tests
+  - Solidity: 15 tests
   - Utilities: 35 tests
 - **Code Coverage**: Comprehensive
 - **Linting**: Enforced via `zig build lint`
