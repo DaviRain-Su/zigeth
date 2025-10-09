@@ -1,12 +1,12 @@
 # Zigeth
 
-[![CI](https://github.com/yourusername/zigeth/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/zigeth/actions/workflows/ci.yml)
+[![CI](https://github.com/ch4r10t33r/zigeth/actions/workflows/ci.yml/badge.svg)](https://github.com/ch4r10t33r/zigeth/actions/workflows/ci.yml)
 [![Zig](https://img.shields.io/badge/Zig-0.14.1-orange.svg)](https://ziglang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A comprehensive Ethereum library for Zig, providing complete cryptographic primitives, transaction handling, RPC client framework, and utilities for seamless integration with Ethereum networks.
 
-**Current Status**: 109 tests passing | 35% complete | Production-ready crypto & primitives
+**Current Status**: 132 tests passing | 40% complete | Production-ready crypto, ABI & primitives
 
 ## 🏗️ Architecture
 
@@ -37,11 +37,11 @@ zigeth/
 │   │   ├── ecdsa.zig         # Digital signatures ✅
 │   │   └── utils.zig         # Crypto utilities ✅
 │   │
-│   ├── abi/                  # Application Binary Interface (TODO)
-│   │   ├── encode.zig        # ABI encoding
-│   │   ├── decode.zig        # ABI decoding
-│   │   ├── types.zig         # ABI type definitions
-│   │   └── packed.zig        # Packed encoding
+│   ├── abi/                  # Application Binary Interface ✅ IMPLEMENTED
+│   │   ├── encode.zig        # ABI encoding ✅
+│   │   ├── decode.zig        # ABI decoding ✅
+│   │   ├── types.zig         # ABI type definitions ✅
+│   │   └── packed.zig        # Packed encoding (EIP-712) ✅
 │   │
 │   ├── rlp/                  # Recursive Length Prefix (TODO)
 │   │   ├── encode.zig        # RLP encoding
@@ -134,6 +134,14 @@ zigeth/
   - `debug_*` namespace (7 methods)
   - Type-safe request/response handling
 
+- **📦 ABI Encoding/Decoding** (4 modules, 23 tests):
+  - Complete ABI type system (uint, int, address, bool, bytes, string, arrays, tuples)
+  - Standard ABI encoding (32-byte aligned, padded)
+  - Standard ABI decoding with type safety
+  - Packed encoding for EIP-712 and hashing
+  - Function selector generation
+  - Event signature generation
+
 - **🧰 Utilities**:
   - Hex encoding/decoding with 0x prefix support
   - Memory-safe allocations
@@ -141,9 +149,9 @@ zigeth/
 
 ### 🚧 **Planned Features**
 
-- **📦 ABI & RLP**: Encoding/decoding for Ethereum data formats
-- **🌐 Providers**: HTTP, WebSocket, IPC provider implementations
-- **📝 Smart Contracts**: Contract deployment, interaction, and event parsing
+- **📜 RLP Encoding**: Recursive Length Prefix for transaction encoding
+- **🌐 Providers**: HTTP, WebSocket, IPC provider implementations with JSON-RPC
+- **📝 Smart Contracts**: High-level contract deployment and interaction
 - **🔑 Wallet Management**: Software wallets, keystore, and hardware wallet support
 - **⚙️ Middleware**: Gas estimation, nonce management, and transaction signing
 - **🌍 Network Support**: Pre-configured settings for major Ethereum networks
@@ -167,7 +175,7 @@ Add zigeth to your project's `build.zig.zon`:
 ```zig
 .dependencies = .{
     .zigeth = .{
-        .url = "https://github.com/yourusername/zigeth/archive/main.tar.gz",
+        .url = "https://github.com/ch4r10t33r/zigeth/archive/main.tar.gz",
         .hash = "...", // Run `zig build` to get the hash
     },
 },
@@ -616,11 +624,12 @@ All Ethereum transaction types are fully supported:
 
 ## 📊 Testing & Quality
 
-- **Total Tests**: 109 passing ✓
+- **Total Tests**: 132 passing ✓
   - Primitives: 48 tests
   - Types: 23 tests
   - Crypto: 27 tests
   - RPC: 13 tests
+  - ABI: 23 tests
   - Utilities: 8 tests
 - **Code Coverage**: Comprehensive
 - **Linting**: Enforced via `zig build lint`
@@ -635,6 +644,7 @@ All Ethereum transaction types are fully supported:
 - [x] Primitives (Address, Hash, Signature, U256, Bloom, Bytes)
 - [x] Protocol Types (Transaction, Block, Receipt, Log)
 - [x] Cryptography (Keccak-256, ECDSA, secp256k1)
+- [x] ABI encoding/decoding (standard & packed)
 - [x] Build system & CI/CD
 
 ### Phase 2: Communication Layer 🚧 In Progress
@@ -644,9 +654,9 @@ All Ethereum transaction types are fully supported:
 - [ ] JSON serialization/deserialization
 - [ ] WebSocket support
 
-### Phase 3: Data Encoding ⏳ Planned
+### Phase 3: Data Encoding 🚧 In Progress
+- [x] ABI encoding/decoding (standard & packed)
 - [ ] RLP encoding/decoding
-- [ ] ABI encoding/decoding
 - [ ] Typed data signing (EIP-712)
 
 ### Phase 4: High-Level APIs ⏳ Planned
