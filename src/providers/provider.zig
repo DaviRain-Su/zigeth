@@ -14,31 +14,35 @@ const Receipt = @import("../types/receipt.zig").Receipt;
 /// Provider interface for Ethereum network access
 pub const Provider = struct {
     rpc_client: RpcClient,
-    eth: EthNamespace,
-    net: NetNamespace,
-    web3: Web3Namespace,
-    debug: DebugNamespace,
     allocator: std.mem.Allocator,
 
     /// Initialize a new provider
     pub fn init(allocator: std.mem.Allocator, endpoint: []const u8) !Provider {
         const rpc_client = try RpcClient.init(allocator, endpoint);
-        var provider = Provider{
+        return Provider{
             .rpc_client = rpc_client,
-            .eth = undefined,
-            .net = undefined,
-            .web3 = undefined,
-            .debug = undefined,
             .allocator = allocator,
         };
+    }
 
-        // Initialize namespaces with pointer to rpc_client
-        provider.eth = EthNamespace.init(&provider.rpc_client);
-        provider.net = NetNamespace.init(&provider.rpc_client);
-        provider.web3 = Web3Namespace.init(&provider.rpc_client);
-        provider.debug = DebugNamespace.init(&provider.rpc_client);
+    /// Get EthNamespace (creates on-demand to avoid dangling pointers)
+    pub fn getEth(self: *Provider) EthNamespace {
+        return EthNamespace.init(&self.rpc_client);
+    }
 
-        return provider;
+    /// Get NetNamespace (creates on-demand)
+    pub fn getNet(self: *Provider) NetNamespace {
+        return NetNamespace.init(&self.rpc_client);
+    }
+
+    /// Get Web3Namespace (creates on-demand)
+    pub fn getWeb3(self: *Provider) Web3Namespace {
+        return Web3Namespace.init(&self.rpc_client);
+    }
+
+    /// Get DebugNamespace (creates on-demand)
+    pub fn getDebug(self: *Provider) DebugNamespace {
+        return DebugNamespace.init(&self.rpc_client);
     }
 
     /// Free allocated memory
@@ -47,83 +51,97 @@ pub const Provider = struct {
     }
 
     /// Get the endpoint URL
-    pub fn getEndpoint(self: Provider) []const u8 {
+    pub fn getEndpoint(self: *Provider) []const u8 {
         return self.rpc_client.endpoint;
     }
 
     /// Get current block number
-    pub fn getBlockNumber(self: Provider) !u64 {
-        return try self.eth.blockNumber();
+    pub fn getBlockNumber(self: *Provider) !u64 {
+        var eth = self.getEth();
+        return try eth.blockNumber();
     }
 
     /// Get account balance
-    pub fn getBalance(self: Provider, address: Address) !u256 {
-        return try self.eth.getBalance(address, .{ .tag = .latest });
+    pub fn getBalance(self: *Provider, address: Address) !u256 {
+        var eth = self.getEth();
+        return try eth.getBalance(address, .{ .tag = .latest });
     }
 
     /// Get transaction count (nonce)
-    pub fn getTransactionCount(self: Provider, address: Address) !u64 {
-        return try self.eth.getTransactionCount(address, .{ .tag = .latest });
+    pub fn getTransactionCount(self: *Provider, address: Address) !u64 {
+        var eth = self.getEth();
+        return try eth.getTransactionCount(address, .{ .tag = .latest });
     }
 
     /// Get contract code
-    pub fn getCode(self: Provider, address: Address) ![]u8 {
-        return try self.eth.getCode(address, .{ .tag = .latest });
+    pub fn getCode(self: *Provider, address: Address) ![]u8 {
+        var eth = self.getEth();
+        return try eth.getCode(address, .{ .tag = .latest });
     }
 
     /// Get chain ID
-    pub fn getChainId(self: Provider) !u64 {
-        return try self.eth.chainId();
+    pub fn getChainId(self: *Provider) !u64 {
+        var eth = self.getEth();
+        return try eth.chainId();
     }
 
     /// Get network ID
-    pub fn getNetworkId(self: Provider) !u64 {
-        return try self.net.version();
+    pub fn getNetworkId(self: *Provider) !u64 {
+        var net = self.getNet();
+        return try net.version();
     }
 
     /// Get gas price
-    pub fn getGasPrice(self: Provider) !u256 {
-        return try self.eth.gasPrice();
+    pub fn getGasPrice(self: *Provider) !u256 {
+        var eth = self.getEth();
+        return try eth.gasPrice();
     }
 
     /// Get latest block
-    pub fn getLatestBlock(self: Provider) !Block {
-        return try self.eth.getBlockByNumber(.{ .tag = .latest }, false);
+    pub fn getLatestBlock(self: *Provider) !Block {
+        var eth = self.getEth();
+        return try eth.getBlockByNumber(.{ .tag = .latest }, false);
     }
 
     /// Get block by number
-    pub fn getBlock(self: Provider, block_number: u64, full_tx: bool) !Block {
-        return try self.eth.getBlockByNumber(.{ .number = block_number }, full_tx);
+    pub fn getBlock(self: *Provider, block_number: u64, full_tx: bool) !Block {
+        var eth = self.getEth();
+        return try eth.getBlockByNumber(.{ .number = block_number }, full_tx);
     }
 
     /// Get block by hash
-    pub fn getBlockByHash(self: Provider, hash: Hash, full_tx: bool) !Block {
-        return try self.eth.getBlockByHash(hash, full_tx);
+    pub fn getBlockByHash(self: *Provider, hash: Hash, full_tx: bool) !Block {
+        var eth = self.getEth();
+        return try eth.getBlockByHash(hash, full_tx);
     }
 
     /// Get transaction by hash
-    pub fn getTransaction(self: Provider, hash: Hash) !Transaction {
-        return try self.eth.getTransactionByHash(hash);
+    pub fn getTransaction(self: *Provider, hash: Hash) !Transaction {
+        var eth = self.getEth();
+        return try eth.getTransactionByHash(hash);
     }
 
     /// Get transaction receipt
-    pub fn getTransactionReceipt(self: Provider, hash: Hash) !Receipt {
-        return try self.eth.getTransactionReceipt(hash);
+    pub fn getTransactionReceipt(self: *Provider, hash: Hash) !Receipt {
+        var eth = self.getEth();
+        return try eth.getTransactionReceipt(hash);
     }
 
     /// Send signed transaction
-    pub fn sendTransaction(self: Provider, signed_tx: []const u8) !Hash {
-        return try self.eth.sendRawTransaction(signed_tx);
+    pub fn sendTransaction(self: *Provider, signed_tx: []const u8) !Hash {
+        var eth = self.getEth();
+        return try eth.sendRawTransaction(signed_tx);
     }
 
     /// Estimate gas for transaction
-    pub fn estimateGas(self: Provider, params: @import("../rpc/types.zig").CallParams) !u64 {
-        return try self.eth.estimateGas(params);
+    pub fn estimateGas(self: *Provider, params: @import("../rpc/types.zig").CallParams) !u64 {
+        var eth = self.getEth();
+        return try eth.estimateGas(params);
     }
 
     /// Wait for transaction to be mined
     pub fn waitForTransaction(
-        self: Provider,
+        self: *Provider,
         tx_hash: Hash,
         timeout_ms: u64,
         poll_interval_ms: u64,
@@ -132,7 +150,8 @@ pub const Provider = struct {
 
         while (true) {
             // Try to get receipt
-            const receipt = self.eth.getTransactionReceipt(tx_hash) catch |err| {
+            var eth = self.getEth();
+            const receipt = eth.getTransactionReceipt(tx_hash) catch |err| {
                 if (err == error.ReceiptNotFound) {
                     // Check timeout
                     const elapsed = std.time.milliTimestamp() - start_time;
@@ -152,7 +171,7 @@ pub const Provider = struct {
     }
 
     /// Check if address is a contract
-    pub fn isContract(self: Provider, address: Address) !bool {
+    pub fn isContract(self: *Provider, address: Address) !bool {
         const code = try self.getCode(address);
         defer self.allocator.free(code);
         return code.len > 0;

@@ -95,7 +95,9 @@ pub const RpcClient = struct {
 
     /// Make a JSON-RPC call with no parameters
     pub fn callNoParams(self: *RpcClient, method: []const u8) !std.json.Value {
-        const params = std.json.Value{ .array = std.json.Array.init(self.allocator) };
+        // Create empty array using fromOwnedSlice with empty slice
+        const empty_slice: []std.json.Value = &[_]std.json.Value{};
+        const params = std.json.Value{ .array = std.json.Array.fromOwnedSlice(self.allocator, @constCast(empty_slice)) };
         return try self.call(method, params);
     }
 };

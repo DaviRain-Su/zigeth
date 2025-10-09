@@ -12,7 +12,7 @@ pub const HttpProvider = struct {
     }
 
     /// Free allocated memory
-    pub fn deinit(self: HttpProvider) void {
+    pub fn deinit(self: *HttpProvider) void {
         self.provider.deinit();
     }
 
@@ -22,39 +22,39 @@ pub const HttpProvider = struct {
     }
 
     /// Common provider methods (convenience wrappers)
-    pub fn getBlockNumber(self: HttpProvider) !u64 {
+    pub fn getBlockNumber(self: *HttpProvider) !u64 {
         return try self.provider.getBlockNumber();
     }
 
-    pub fn getBalance(self: HttpProvider, address: @import("../primitives/address.zig").Address) !u256 {
+    pub fn getBalance(self: *HttpProvider, address: @import("../primitives/address.zig").Address) !u256 {
         return try self.provider.getBalance(address);
     }
 
-    pub fn getChainId(self: HttpProvider) !u64 {
+    pub fn getChainId(self: *HttpProvider) !u64 {
         return try self.provider.getChainId();
     }
 
-    pub fn getTransactionCount(self: HttpProvider, address: @import("../primitives/address.zig").Address) !u64 {
+    pub fn getTransactionCount(self: *HttpProvider, address: @import("../primitives/address.zig").Address) !u64 {
         return try self.provider.getTransactionCount(address);
     }
 
-    pub fn getGasPrice(self: HttpProvider) !u256 {
+    pub fn getGasPrice(self: *HttpProvider) !u256 {
         return try self.provider.getGasPrice();
     }
 
-    pub fn getLatestBlock(self: HttpProvider) !@import("../types/block.zig").Block {
+    pub fn getLatestBlock(self: *HttpProvider) !@import("../types/block.zig").Block {
         return try self.provider.getLatestBlock();
     }
 
-    pub fn getTransaction(self: HttpProvider, hash: @import("../primitives/hash.zig").Hash) !@import("../types/transaction.zig").Transaction {
+    pub fn getTransaction(self: *HttpProvider, hash: @import("../primitives/hash.zig").Hash) !@import("../types/transaction.zig").Transaction {
         return try self.provider.getTransaction(hash);
     }
 
-    pub fn getTransactionReceipt(self: HttpProvider, hash: @import("../primitives/hash.zig").Hash) !@import("../types/receipt.zig").Receipt {
+    pub fn getTransactionReceipt(self: *HttpProvider, hash: @import("../primitives/hash.zig").Hash) !@import("../types/receipt.zig").Receipt {
         return try self.provider.getTransactionReceipt(hash);
     }
 
-    pub fn sendTransaction(self: HttpProvider, signed_tx: []const u8) !@import("../primitives/hash.zig").Hash {
+    pub fn sendTransaction(self: *HttpProvider, signed_tx: []const u8) !@import("../primitives/hash.zig").Hash {
         return try self.provider.sendTransaction(signed_tx);
     }
 
@@ -66,7 +66,7 @@ pub const HttpProvider = struct {
         return try self.provider.waitForTransaction(tx_hash, timeout_ms, 1000);
     }
 
-    pub fn isContract(self: HttpProvider, address: @import("../primitives/address.zig").Address) !bool {
+    pub fn isContract(self: *HttpProvider, address: @import("../primitives/address.zig").Address) !bool {
         return try self.provider.isContract(address);
     }
 };

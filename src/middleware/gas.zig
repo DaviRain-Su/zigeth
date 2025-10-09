@@ -167,7 +167,8 @@ pub const GasMiddleware = struct {
         _ = base_fee; // Reserved for future use
 
         // Try to get max priority fee from provider
-        const suggested_priority = self.provider.eth.maxPriorityFeePerGas() catch {
+        var eth = self.provider.getEth();
+        const suggested_priority = eth.maxPriorityFeePerGas() catch {
             // Fallback: 2.5 gwei for standard, adjust for strategy
             return @as(u256, 2_500_000_000);
         };

@@ -93,41 +93,50 @@ pub const AbiType = union(enum) {
     }
 
     /// Convert AbiType to string representation for selector generation
-    pub fn toString(self: AbiType, allocator: std.mem.Allocator) ![]u8 {
+    /// For simple types, returns const string literals (no allocation)
+    /// For complex types (arrays), allocates and caller must free
+    pub fn toStringAlloc(self: AbiType, allocator: std.mem.Allocator) ![]const u8 {
         return switch (self) {
-            .uint8 => try allocator.dupe(u8, "uint8"),
-            .uint16 => try allocator.dupe(u8, "uint16"),
-            .uint32 => try allocator.dupe(u8, "uint32"),
-            .uint64 => try allocator.dupe(u8, "uint64"),
-            .uint128 => try allocator.dupe(u8, "uint128"),
-            .uint256 => try allocator.dupe(u8, "uint256"),
-            .int8 => try allocator.dupe(u8, "int8"),
-            .int16 => try allocator.dupe(u8, "int16"),
-            .int32 => try allocator.dupe(u8, "int32"),
-            .int64 => try allocator.dupe(u8, "int64"),
-            .int128 => try allocator.dupe(u8, "int128"),
-            .int256 => try allocator.dupe(u8, "int256"),
-            .address => try allocator.dupe(u8, "address"),
-            .bool_type => try allocator.dupe(u8, "bool"),
-            .bytes1 => try allocator.dupe(u8, "bytes1"),
-            .bytes2 => try allocator.dupe(u8, "bytes2"),
-            .bytes4 => try allocator.dupe(u8, "bytes4"),
-            .bytes8 => try allocator.dupe(u8, "bytes8"),
-            .bytes16 => try allocator.dupe(u8, "bytes16"),
-            .bytes32 => try allocator.dupe(u8, "bytes32"),
-            .string => try allocator.dupe(u8, "string"),
-            .bytes => try allocator.dupe(u8, "bytes"),
+            // Return const string literals - NO allocation needed!
+            .uint8 => "uint8",
+            .uint16 => "uint16",
+            .uint32 => "uint32",
+            .uint64 => "uint64",
+            .uint128 => "uint128",
+            .uint256 => "uint256",
+            .int8 => "int8",
+            .int16 => "int16",
+            .int32 => "int32",
+            .int64 => "int64",
+            .int128 => "int128",
+            .int256 => "int256",
+            .address => "address",
+            .bool_type => "bool",
+            .bytes1 => "bytes1",
+            .bytes2 => "bytes2",
+            .bytes4 => "bytes4",
+            .bytes8 => "bytes8",
+            .bytes16 => "bytes16",
+            .bytes32 => "bytes32",
+            .string => "string",
+            .bytes => "bytes",
+            // Complex types need allocation
             .array => |arr| {
-                const elem_str = try arr.element_type.toString(allocator);
-                defer allocator.free(elem_str);
+                const elem_str = try arr.element_type.toStringAlloc(allocator);
+                // Only free if it was actually allocated (for nested arrays)
                 if (arr.length) |len| {
                     return try std.fmt.allocPrint(allocator, "{s}[{d}]", .{ elem_str, len });
                 } else {
                     return try std.fmt.allocPrint(allocator, "{s}[]", .{elem_str});
                 }
             },
-            .tuple => try allocator.dupe(u8, "tuple"),
+            .tuple => "tuple",
         };
+    }
+
+    /// Legacy name for backwards compatibility
+    pub fn toString(self: AbiType, allocator: std.mem.Allocator) ![]const u8 {
+        return self.toStringAlloc(allocator);
     }
 };
 
