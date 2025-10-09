@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    env:
+      ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.zig-cache/global
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Check formatting
+        run: zig build fmt-check
+
+      - name: Run linting
+        run: zig build lint
+
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    
+    env:
+      ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.zig-cache/global
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Cache Zig artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .zig-cache
+            zig-out
+          key: ${{ runner.os }}-zig-test-${{ hashFiles('build.zig', 'build.zig.zon', 'src/**/*.zig') }}
+          restore-keys: |
+            ${{ runner.os }}-zig-test-
+            ${{ runner.os }}-zig-
+
+      - name: Build library
+        run: zig build
+
+      - name: Run tests
+        run: zig build test
+
+  build:
+    name: Build on ${{ matrix.os }} (${{ matrix.optimize }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        optimize: [Debug, ReleaseSafe, ReleaseFast, ReleaseSmall]
+    
+    env:
+      ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.zig-cache/global
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Cache Zig artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .zig-cache
+            zig-out
+          key: ${{ runner.os }}-zig-${{ matrix.optimize }}-${{ hashFiles('build.zig', 'build.zig.zon', 'src/**/*.zig') }}
+          restore-keys: |
+            ${{ runner.os }}-zig-${{ matrix.optimize }}-
+            ${{ runner.os }}-zig-
+
+      - name: Build (${{ matrix.optimize }})
+        run: zig build -Doptimize=${{ matrix.optimize }}
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    env:
+      ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.zig-cache/global
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Run tests with coverage
+        run: zig build test
+
+      - name: Generate coverage report
+        run: |
+          echo "Coverage reporting not yet configured"
+          # TODO: Add coverage reporting when available
+
+  docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    env:
+      ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.zig-cache/global
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Build documentation
+        run: zig build docs
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs
+          path: zig-out/docs/
+
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, test, build]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.lint.result }}" == "failure" ] || \
+             [ "${{ needs.test.result }}" == "failure" ] || \
+             [ "${{ needs.build.result }}" == "failure" ]; then
+            echo "❌ CI failed"
+            exit 1
+          else
+            echo "✅ All CI checks passed"
+          fi
+
