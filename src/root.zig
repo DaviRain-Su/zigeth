@@ -43,8 +43,25 @@ pub const crypto = struct {
 };
 
 pub const abi = struct {
+    pub const abi_types = @import("abi/types.zig");
     pub const encode = @import("abi/encode.zig");
     pub const decode = @import("abi/decode.zig");
+    pub const abi_packed = @import("abi/packed.zig");
+
+    // Re-export commonly used types
+    pub const AbiType = abi_types.AbiType;
+    pub const AbiValue = abi_types.AbiValue;
+    pub const Function = abi_types.Function;
+    pub const Event = abi_types.Event;
+    pub const Parameter = abi_types.Parameter;
+    pub const Encoder = encode.Encoder;
+    pub const Decoder = decode.Decoder;
+    pub const PackedEncoder = abi_packed.PackedEncoder;
+    pub const PackedValue = abi_packed.PackedValue;
+    pub const encodeFunctionCall = encode.encodeFunctionCall;
+    pub const decodeFunctionReturn = decode.decodeFunctionReturn;
+    pub const encodePacked = abi_packed.encodePacked;
+    pub const hashPacked = abi_packed.hashPacked;
 };
 
 pub const rlp = struct {
