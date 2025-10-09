@@ -121,11 +121,13 @@ pub fn build(b: *std.Build) void {
 
         // Add example executables here
         const example_names = [_][]const u8{
-            "basic_usage",
-            "rpc_client",
-            "contract_interaction",
-            "wallet_management",
-            "transaction_signing",
+            "01_wallet_creation",
+            "02_query_blockchain",
+            "03_send_transaction",
+            "04_smart_contracts",
+            "05_transaction_receipts",
+            "06_event_monitoring",
+            "07_complete_workflow",
         };
 
         for (example_names) |example_name| {
