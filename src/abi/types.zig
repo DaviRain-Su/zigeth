@@ -1,6 +1,5 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
-const U256 = @import("../primitives/uint.zig").U256;
 const Bytes = @import("../primitives/bytes.zig").Bytes;
 
 /// ABI type system for Solidity types
@@ -134,7 +133,7 @@ pub const AbiType = union(enum) {
 
 /// ABI encoded value
 pub const AbiValue = union(enum) {
-    uint: U256,
+    uint: u256,
     int: i256,
     address: Address,
     bool_val: bool,

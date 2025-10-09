@@ -26,7 +26,7 @@ pub const HttpProvider = struct {
         return try self.provider.getBlockNumber();
     }
 
-    pub fn getBalance(self: HttpProvider, address: @import("../primitives/address.zig").Address) !@import("../primitives/uint.zig").U256 {
+    pub fn getBalance(self: HttpProvider, address: @import("../primitives/address.zig").Address) !u256 {
         return try self.provider.getBalance(address);
     }
 
@@ -38,7 +38,7 @@ pub const HttpProvider = struct {
         return try self.provider.getTransactionCount(address);
     }
 
-    pub fn getGasPrice(self: HttpProvider) !@import("../primitives/uint.zig").U256 {
+    pub fn getGasPrice(self: HttpProvider) !u256 {
         return try self.provider.getGasPrice();
     }
 

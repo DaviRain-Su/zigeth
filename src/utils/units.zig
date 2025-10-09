@@ -1,5 +1,5 @@
 const std = @import("std");
-const U256 = @import("../primitives/uint.zig").U256;
+const U256 = @import("../primitives/uint.zig").U256; // Legacy compatibility
 
 /// Ethereum unit denominations
 pub const Unit = enum {
@@ -83,9 +83,17 @@ pub fn etherToWei(ether: f64) !U256 {
     return U256.fromInt(@as(u64, @intFromFloat(wei_value)));
 }
 
-/// Convert wei to ether as a floating point
-pub fn weiToEther(wei: U256) !f64 {
-    const wei_u64 = try wei.tryToU64();
+/// Convert wei to ether as a floating point (native u256 version)
+pub fn weiToEther(wei: anytype) !f64 {
+    const T = @TypeOf(wei);
+    const wei_u64 = if (T == u256) blk: {
+        if (wei > std.math.maxInt(u64)) return error.ValueTooLarge;
+        break :blk @as(u64, @intCast(wei));
+    } else if (T == U256) blk: {
+        break :blk try wei.tryToU64();
+    } else {
+        @compileError("weiToEther expects u256 or U256");
+    };
     const wei_per_ether: f64 = 1_000_000_000_000_000_000.0;
     return @as(f64, @floatFromInt(wei_u64)) / wei_per_ether;
 }

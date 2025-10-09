@@ -6,7 +6,7 @@ const Web3Namespace = @import("../rpc/web3.zig").Web3Namespace;
 const DebugNamespace = @import("../rpc/debug.zig").DebugNamespace;
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
+const uint_utils = @import("../primitives/uint.zig");
 const Block = @import("../types/block.zig").Block;
 const Transaction = @import("../types/transaction.zig").Transaction;
 const Receipt = @import("../types/receipt.zig").Receipt;
@@ -57,7 +57,7 @@ pub const Provider = struct {
     }
 
     /// Get account balance
-    pub fn getBalance(self: Provider, address: Address) !U256 {
+    pub fn getBalance(self: Provider, address: Address) !u256 {
         return try self.eth.getBalance(address, .{ .tag = .latest });
     }
 
@@ -82,7 +82,7 @@ pub const Provider = struct {
     }
 
     /// Get gas price
-    pub fn getGasPrice(self: Provider) !U256 {
+    pub fn getGasPrice(self: Provider) !u256 {
         return try self.eth.gasPrice();
     }
 

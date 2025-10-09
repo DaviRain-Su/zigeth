@@ -2,7 +2,6 @@ const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
 const Bloom = @import("../primitives/bloom.zig").Bloom;
-const U256 = @import("../primitives/uint.zig").U256;
 const Bytes = @import("../primitives/bytes.zig").Bytes;
 const Transaction = @import("./transaction.zig").Transaction;
 
@@ -30,7 +29,7 @@ pub const BlockHeader = struct {
     logs_bloom: Bloom,
 
     /// Difficulty
-    difficulty: U256,
+    difficulty: u256,
 
     /// Block number
     number: u64,
@@ -54,7 +53,7 @@ pub const BlockHeader = struct {
     nonce: u64,
 
     /// Base fee per gas (EIP-1559, post-London)
-    base_fee_per_gas: ?U256,
+    base_fee_per_gas: ?u256,
 
     /// Withdrawals root (post-Shanghai)
     withdrawals_root: ?Hash,
@@ -108,7 +107,7 @@ pub const Block = struct {
     uncles: []Hash,
 
     /// Total difficulty up to this block
-    total_difficulty: U256,
+    total_difficulty: u256,
 
     /// Block size in bytes
     size: u64,
@@ -122,7 +121,7 @@ pub const Block = struct {
         header: BlockHeader,
         transactions: []const Transaction,
         uncles: []const Hash,
-        total_difficulty: U256,
+        total_difficulty: u256,
         size: u64,
     ) !Block {
         const transactions_copy = try allocator.dupe(Transaction, transactions);
@@ -176,10 +175,10 @@ pub const Block = struct {
     }
 
     /// Calculate block reward (simplified - doesn't include uncle rewards)
-    pub fn calculateBaseReward(self: Block) U256 {
+    pub fn calculateBaseReward(self: Block) u256 {
         // Post-merge: no block reward
         if (self.header.isPostMerge()) {
-            return U256.zero();
+            return 0;
         }
 
         // Pre-merge block rewards:
@@ -189,11 +188,11 @@ pub const Block = struct {
         const block_num = self.header.number;
 
         if (block_num < 4_370_000) {
-            return U256.fromInt(5_000_000_000_000_000_000); // 5 ETH
+            return @as(u256, 5_000_000_000_000_000_000); // 5 ETH
         } else if (block_num < 7_280_000) {
-            return U256.fromInt(3_000_000_000_000_000_000); // 3 ETH
+            return @as(u256, 3_000_000_000_000_000_000); // 3 ETH
         } else {
-            return U256.fromInt(2_000_000_000_000_000_000); // 2 ETH
+            return @as(u256, 2_000_000_000_000_000_000); // 2 ETH
         }
     }
 
@@ -220,7 +219,7 @@ test "block header post-merge detection" {
         .transactions_root = Hash.zero(),
         .receipts_root = Hash.zero(),
         .logs_bloom = Bloom.empty(),
-        .difficulty = U256.zero(), // Post-merge: difficulty = 0
+        .difficulty = 0, // Post-merge: difficulty = 0
         .number = 15537394,
         .gas_limit = 30000000,
         .gas_used = 15000000,
@@ -228,7 +227,7 @@ test "block header post-merge detection" {
         .extra_data = Bytes.empty(std.testing.allocator),
         .mix_hash = Hash.zero(),
         .nonce = 0,
-        .base_fee_per_gas = U256.fromInt(15000000000),
+        .base_fee_per_gas = @as(u256, 15000000000),
         .withdrawals_root = null,
         .blob_gas_used = null,
         .excess_blob_gas = null,
@@ -253,7 +252,7 @@ test "block creation" {
         .transactions_root = Hash.zero(),
         .receipts_root = Hash.zero(),
         .logs_bloom = Bloom.empty(),
-        .difficulty = U256.fromInt(1000000),
+        .difficulty = @as(u256, 1000000),
         .number = 12345,
         .gas_limit = 30000000,
         .gas_used = 15000000,
@@ -274,7 +273,7 @@ test "block creation" {
         header,
         &[_]Transaction{}, // no transactions
         &[_]Hash{}, // no uncles
-        U256.fromInt(5000000),
+        @as(u256, 5000000),
         1024,
     );
     defer block.deinit();
@@ -296,7 +295,7 @@ test "block gas utilization" {
         .transactions_root = Hash.zero(),
         .receipts_root = Hash.zero(),
         .logs_bloom = Bloom.empty(),
-        .difficulty = U256.fromInt(1000000),
+        .difficulty = @as(u256, 1000000),
         .number = 12345,
         .gas_limit = 30000000,
         .gas_used = 15000000, // 50% utilization
@@ -317,7 +316,7 @@ test "block gas utilization" {
         header,
         &[_]Transaction{},
         &[_]Hash{},
-        U256.fromInt(5000000),
+        @as(u256, 5000000),
         1024,
     );
     defer block.deinit();
@@ -340,7 +339,7 @@ test "block reward calculation" {
         .transactions_root = Hash.zero(),
         .receipts_root = Hash.zero(),
         .logs_bloom = Bloom.empty(),
-        .difficulty = U256.fromInt(1000000), // Non-zero difficulty
+        .difficulty = @as(u256, 1000000), // Non-zero difficulty
         .number = 1000000,
         .gas_limit = 30000000,
         .gas_used = 15000000,
@@ -361,11 +360,11 @@ test "block reward calculation" {
         header,
         &[_]Transaction{},
         &[_]Hash{},
-        U256.fromInt(5000000),
+        @as(u256, 5000000),
         1024,
     );
     defer block.deinit();
 
     const reward = block.calculateBaseReward();
-    try std.testing.expect(reward.eql(U256.fromInt(5_000_000_000_000_000_000)));
+    try std.testing.expectEqual(@as(u256, 5_000_000_000_000_000_000), reward);
 }

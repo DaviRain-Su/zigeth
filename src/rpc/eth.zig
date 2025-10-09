@@ -3,7 +3,7 @@ const RpcClient = @import("./client.zig").RpcClient;
 const types = @import("./types.zig");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
+const uint_utils = @import("../primitives/uint.zig");
 const Bytes = @import("../primitives/bytes.zig").Bytes;
 const Signature = @import("../primitives/signature.zig").Signature;
 const Block = @import("../types/block.zig").Block;
@@ -33,7 +33,7 @@ pub const EthNamespace = struct {
     }
 
     /// eth_getBalance - Returns the balance of an account
-    pub fn getBalance(self: EthNamespace, address: Address, block: types.BlockParameter) !U256 {
+    pub fn getBalance(self: EthNamespace, address: Address, block: types.BlockParameter) !u256 {
         const addr_hex = try address.toHex(self.client.allocator);
         defer self.client.allocator.free(addr_hex);
 
@@ -51,7 +51,7 @@ pub const EthNamespace = struct {
             return error.InvalidResponse;
         }
 
-        return try U256.fromHex(result.string);
+        return try uint_utils.u256FromHex(result.string);
     }
 
     /// eth_getTransactionCount - Returns the number of transactions sent from an address
@@ -209,25 +209,25 @@ pub const EthNamespace = struct {
     }
 
     /// eth_gasPrice - Returns the current gas price in wei
-    pub fn gasPrice(self: EthNamespace) !U256 {
+    pub fn gasPrice(self: EthNamespace) !u256 {
         const result = try self.client.callNoParams("eth_gasPrice");
 
         if (result != .string) {
             return error.InvalidResponse;
         }
 
-        return try U256.fromHex(result.string);
+        return try uint_utils.u256FromHex(result.string);
     }
 
     /// eth_maxPriorityFeePerGas - Returns the current max priority fee per gas
-    pub fn maxPriorityFeePerGas(self: EthNamespace) !U256 {
+    pub fn maxPriorityFeePerGas(self: EthNamespace) !u256 {
         const result = try self.client.callNoParams("eth_maxPriorityFeePerGas");
 
         if (result != .string) {
             return error.InvalidResponse;
         }
 
-        return try U256.fromHex(result.string);
+        return try uint_utils.u256FromHex(result.string);
     }
 
     /// eth_feeHistory - Returns historical gas information
@@ -290,11 +290,11 @@ pub const EthNamespace = struct {
     }
 
     /// eth_getStorageAt - Returns the value from a storage position
-    pub fn getStorageAt(self: EthNamespace, address: Address, position: U256, block: types.BlockParameter) !Hash {
+    pub fn getStorageAt(self: EthNamespace, address: Address, position: u256, block: types.BlockParameter) !Hash {
         const addr_hex = try address.toHex(self.client.allocator);
         defer self.client.allocator.free(addr_hex);
 
-        const position_hex = try position.toHex(self.client.allocator);
+        const position_hex = try uint_utils.u256ToHex(position, self.client.allocator);
         defer self.client.allocator.free(position_hex);
 
         const block_param = try blockParameterToString(self.client.allocator, block);
@@ -815,7 +815,7 @@ fn parseTransactionFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMa
 
     const value_str = obj.get("value") orelse return error.MissingField;
     if (value_str != .string) return error.InvalidFieldType;
-    const value = try U256.fromHex(value_str.string);
+    const value = try uint_utils.u256FromHex(value_str.string);
 
     const data_str = obj.get("input") orelse obj.get("data") orelse return error.MissingField;
     if (data_str != .string) return error.InvalidFieldType;
@@ -832,14 +832,14 @@ fn parseTransactionFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMa
     }
 
     // Parse gas price fields based on transaction type
-    var gas_price: ?U256 = null;
-    var max_fee_per_gas: ?U256 = null;
-    var max_priority_fee_per_gas: ?U256 = null;
+    var gas_price: ?u256 = null;
+    var max_fee_per_gas: ?u256 = null;
+    var max_priority_fee_per_gas: ?u256 = null;
 
     if (tx_type == .legacy or tx_type == .eip2930) {
         if (obj.get("gasPrice")) |gp| {
             if (gp == .string) {
-                gas_price = try U256.fromHex(gp.string);
+                gas_price = try uint_utils.u256FromHex(gp.string);
             }
         }
     }
@@ -847,12 +847,12 @@ fn parseTransactionFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMa
     if (tx_type == .eip1559 or tx_type == .eip4844) {
         if (obj.get("maxFeePerGas")) |max_fee| {
             if (max_fee == .string) {
-                max_fee_per_gas = try U256.fromHex(max_fee.string);
+                max_fee_per_gas = try uint_utils.u256FromHex(max_fee.string);
             }
         }
         if (obj.get("maxPriorityFeePerGas")) |max_priority| {
             if (max_priority == .string) {
-                max_priority_fee_per_gas = try U256.fromHex(max_priority.string);
+                max_priority_fee_per_gas = try uint_utils.u256FromHex(max_priority.string);
             }
         }
     }
@@ -925,10 +925,10 @@ fn parseTransactionFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMa
     if (v_val != null and r_val != null and s_val != null) {
         if (v_val.? == .string and r_val.? == .string and s_val.? == .string) {
             const v = try parseHexU64(v_val.?.string);
-            const r = try U256.fromHex(r_val.?.string);
-            const s = try U256.fromHex(s_val.?.string);
+            const r = try uint_utils.u256FromHex(r_val.?.string);
+            const s = try uint_utils.u256FromHex(s_val.?.string);
 
-            tx.signature = Signature.init(r.toBytes(), s.toBytes(), @intCast(v));
+            tx.signature = Signature.init(uint_utils.u256ToBytes(r), uint_utils.u256ToBytes(s), @intCast(v));
         }
     }
 
@@ -978,7 +978,7 @@ fn parseReceiptFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !
 
     const eff_gas_price_str = obj.get("effectiveGasPrice") orelse return error.MissingField;
     if (eff_gas_price_str != .string) return error.InvalidFieldType;
-    const effective_gas_price = try U256.fromHex(eff_gas_price_str.string);
+    const effective_gas_price = try uint_utils.u256FromHex(eff_gas_price_str.string);
 
     // Parse logs
     const logs_json = obj.get("logs") orelse return error.MissingField;
@@ -1088,7 +1088,7 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
 
     const difficulty_str = obj.get("difficulty") orelse return error.MissingField;
     if (difficulty_str != .string) return error.InvalidFieldType;
-    const difficulty = try U256.fromHex(difficulty_str.string);
+    const difficulty = try uint_utils.u256FromHex(difficulty_str.string);
 
     const number_str = obj.get("number") orelse return error.MissingField;
     if (number_str != .string) return error.InvalidFieldType;
@@ -1121,10 +1121,10 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
     const block_nonce = try parseHexU64(nonce_str.string);
 
     // Optional fields for different forks
-    var base_fee_per_gas: ?U256 = null;
+    var base_fee_per_gas: ?u256 = null;
     if (obj.get("baseFeePerGas")) |base_fee| {
         if (base_fee == .string) {
-            base_fee_per_gas = try U256.fromHex(base_fee.string);
+            base_fee_per_gas = try uint_utils.u256FromHex(base_fee.string);
         }
     }
 
@@ -1211,7 +1211,7 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
                 .gas_price = null,
                 .max_fee_per_gas = null,
                 .max_priority_fee_per_gas = null,
-                .value = U256.zero(),
+                .value = 0,
                 .data = empty_data,
                 .chain_id = null,
                 .access_list = null,
@@ -1236,7 +1236,7 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
         .header = header,
         .transactions = try transactions.toOwnedSlice(),
         .uncles = &[_]Hash{}, // TODO: Parse uncles from JSON
-        .total_difficulty = U256.fromInt(0), // TODO: Parse total difficulty
+        .total_difficulty = 0, // TODO: Parse total difficulty
         .size = 0, // TODO: Parse size from JSON
         .allocator = allocator,
     };

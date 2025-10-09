@@ -6,7 +6,6 @@
 /// - Generate and use mnemonic phrases
 /// - Create HD wallets
 /// - Encrypt and store wallets
-
 const std = @import("std");
 const zigeth = @import("zigeth");
 
@@ -163,4 +162,3 @@ pub fn main() !void {
 
     std.debug.print("🎉 All wallet examples completed!\n\n", .{});
 }
-

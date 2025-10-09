@@ -50,11 +50,11 @@ pub fn main() !void {
         var tx = zigeth.types.Transaction.newLegacy(
             allocator,
             to_address,
-            zigeth.primitives.U256.fromInt(1_000_000_000_000_000), // 0.001 ETH
+            @as(u256, 1_000_000_000_000_000), // 0.001 ETH
             empty_data,
             0, // nonce
             21000, // gas_limit
-            zigeth.primitives.U256.fromInt(20_000_000_000), // 20 gwei gas_price
+            @as(u256, 20_000_000_000), // 20 gwei gas_price
         );
 
         tx.from = from_address;
@@ -76,12 +76,12 @@ pub fn main() !void {
         var tx = zigeth.types.Transaction.newEip1559(
             allocator,
             to_address,
-            zigeth.primitives.U256.fromInt(1_000_000_000_000_000), // 0.001 ETH
+            @as(u256, 1_000_000_000_000_000), // 0.001 ETH
             empty_data,
             1, // nonce
             21000, // gas_limit
-            zigeth.primitives.U256.fromInt(50_000_000_000), // 50 gwei max_fee
-            zigeth.primitives.U256.fromInt(2_000_000_000), // 2 gwei priority_fee
+            @as(u256, 50_000_000_000), // 50 gwei max_fee
+            @as(u256, 2_000_000_000), // 2 gwei priority_fee
             11155111, // chain_id (Sepolia)
             null, // access_list
         );
@@ -122,12 +122,12 @@ pub fn main() !void {
         var tx = zigeth.types.Transaction.newEip1559(
             allocator,
             to_address,
-            zigeth.primitives.U256.fromInt(1_000_000_000_000_000), // 0.001 ETH
+            @as(u256, 1_000_000_000_000_000), // 0.001 ETH
             empty_data,
             nonce,
             21000, // initial gas_limit (will be estimated)
-            zigeth.primitives.U256.fromInt(50_000_000_000), // temp values
-            zigeth.primitives.U256.fromInt(2_000_000_000),
+            @as(u256, 50_000_000_000), // temp values
+            @as(u256, 2_000_000_000),
             11155111, // Sepolia
             null,
         );
@@ -160,12 +160,12 @@ pub fn main() !void {
         var tx = zigeth.types.Transaction.newEip1559(
             allocator,
             to_address,
-            zigeth.primitives.U256.fromInt(1_000_000_000_000_000), // 0.001 ETH
+            @as(u256, 1_000_000_000_000_000), // 0.001 ETH
             empty_data,
             0, // nonce
             21000, // gas_limit
-            zigeth.primitives.U256.fromInt(50_000_000_000), // 50 gwei max_fee
-            zigeth.primitives.U256.fromInt(2_000_000_000), // 2 gwei priority_fee
+            @as(u256, 50_000_000_000), // 50 gwei max_fee
+            @as(u256, 2_000_000_000), // 2 gwei priority_fee
             11155111, // Sepolia
             null, // access_list
         );

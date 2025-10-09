@@ -1,7 +1,7 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
-const U256 = @import("../primitives/uint.zig").U256;
 const Hash = @import("../primitives/hash.zig").Hash;
+const uint_utils = @import("../primitives/uint.zig");
 
 /// Packed ABI encoding (tightly packed, no padding)
 /// Used for hashing and signature generation (e.g., EIP-712)
@@ -21,8 +21,8 @@ pub const PackedEncoder = struct {
     }
 
     /// Encode a uint256 (no padding)
-    pub fn encodeUint256(self: *PackedEncoder, value: U256) !void {
-        const bytes = value.toBytes();
+    pub fn encodeUint256(self: *PackedEncoder, value: u256) !void {
+        const bytes = uint_utils.u256ToBytes(value);
         try self.buffer.appendSlice(&bytes);
     }
 
@@ -30,8 +30,7 @@ pub const PackedEncoder = struct {
     pub fn encodeUint(self: *PackedEncoder, value: u256, size_bytes: usize) !void {
         if (size_bytes > 32) return error.InvalidSize;
 
-        var bytes: [32]u8 = undefined;
-        std.mem.writeInt(u256, &bytes, value, .big);
+        const bytes = uint_utils.u256ToBytes(value);
 
         // Take only the required bytes from the end
         const offset = 32 - size_bytes;
@@ -96,7 +95,7 @@ pub fn encodePacked(
 
 /// Packed value (tightly packed, no padding)
 pub const PackedValue = union(enum) {
-    uint256: U256,
+    uint256: u256,
     uint: struct { value: u256, size_bytes: usize },
     address: Address,
     bool_val: bool,
@@ -135,7 +134,7 @@ test "packed encode uint256" {
     var encoder = PackedEncoder.init(allocator);
     defer encoder.deinit();
 
-    const value = U256.fromInt(42);
+    const value = @as(u256, 42);
     try encoder.encodeUint256(value);
 
     const result = encoder.toSlice();
@@ -191,7 +190,7 @@ test "packed encode multiple values" {
 
     const values = [_]PackedValue{
         .{ .address = Address.fromBytes([_]u8{0xAB} ** 20) },
-        .{ .uint256 = U256.fromInt(100) },
+        .{ .uint256 = @as(u256, 100) },
         .{ .bool_val = true },
     };
 
@@ -229,7 +228,7 @@ test "hash packed values" {
 
     const values = [_]PackedValue{
         .{ .string = "hello" },
-        .{ .uint256 = U256.fromInt(123) },
+        .{ .uint256 = @as(u256, 123) },
     };
 
     const hash = try hashPacked(allocator, &values);
