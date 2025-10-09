@@ -314,8 +314,12 @@ jobs:
           ls -R artifacts/
           
           # Move artifacts to root for easier access
-          find artifacts -type f -name "*.tar.gz" -o -name "*.zip" | while read f; do
-            mv "$f" .
+          # actions/download-artifact@v4 creates subdirectories for each artifact
+          for dir in artifacts/*/; do
+            if [ -d "$dir" ]; then
+              # Find files in each artifact directory
+              find "$dir" -maxdepth 1 -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec mv {} . \;
+            fi
           done
           
           echo ""
