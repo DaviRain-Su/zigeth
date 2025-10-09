@@ -467,9 +467,11 @@ jobs:
       - name: Create Pull Request for version update
         uses: peter-evans/create-pull-request@v5
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: bump version to ${{ needs.determine-release.outputs.new_version }}"
           branch: "release/version-${{ needs.determine-release.outputs.new_version }}"
           delete-branch: true
+          base: master
           title: "chore: bump version to ${{ needs.determine-release.outputs.new_version }}"
           body: |
             🤖 **Automated version bump**
@@ -483,9 +485,16 @@ jobs:
             ## Release
             - Release: [${{ needs.determine-release.outputs.new_version }}](https://github.com/${{ github.repository }}/releases/tag/${{ needs.determine-release.outputs.new_version }})
             
+            ## Instructions
+            This PR was automatically created and can be merged to sync version files.
+            
+            To enable auto-merge for future version PRs:
+            1. Go to Settings → General → Pull Requests
+            2. Enable "Allow auto-merge"
+            
             ---
             
-            This PR can be safely merged or closed if you prefer to keep versions in sync manually.
+            _This PR can be safely merged or closed if you prefer manual version management._
           labels: |
             automated
             release
