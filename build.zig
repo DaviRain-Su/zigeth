@@ -136,6 +136,7 @@ pub fn build(b: *std.Build) void {
             "05_transaction_receipts",
             "06_event_monitoring",
             "07_complete_workflow",
+            "account_abstraction_example",
         };
 
         for (example_names) |example_name| {
