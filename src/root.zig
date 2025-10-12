@@ -223,6 +223,55 @@ pub const middleware = struct {
     pub const SignerMiddleware = signer_mod.SignerMiddleware;
 };
 
+pub const account_abstraction = struct {
+    const aa = @import("account_abstraction/account_abstraction.zig");
+
+    // Re-export all account abstraction modules
+    pub const types = aa.types;
+    pub const bundler = aa.bundler;
+    pub const paymaster = aa.paymaster;
+    pub const smart_account = aa.smart_account;
+    pub const entrypoint = aa.entrypoint;
+    pub const gas = aa.gas;
+    pub const utils = aa.utils;
+
+    // Re-export commonly used types
+    pub const EntryPointVersion = aa.EntryPointVersion;
+    pub const UserOperation = aa.UserOperation; // Default: v0.6
+    pub const UserOperationV06 = aa.UserOperationV06;
+    pub const UserOperationV07 = aa.UserOperationV07;
+    pub const UserOperationV08 = aa.UserOperationV08;
+    pub const UserOperationJson = aa.UserOperationJson;
+    pub const UserOperationReceipt = aa.UserOperationReceipt;
+    pub const GasEstimates = aa.GasEstimates;
+    pub const PaymasterData = aa.PaymasterData;
+
+    // Re-export clients
+    pub const BundlerClient = aa.BundlerClient;
+    pub const PaymasterClient = aa.PaymasterClient;
+    pub const PaymasterMode = aa.PaymasterMode;
+    pub const TokenQuote = aa.TokenQuote;
+
+    // Re-export smart account types
+    pub const SmartAccount = aa.SmartAccount;
+    pub const AccountFactory = aa.AccountFactory;
+    pub const Call = aa.Call;
+
+    // Re-export EntryPoint
+    pub const EntryPoint = aa.EntryPoint;
+    pub const DepositInfo = aa.DepositInfo;
+    pub const ValidationResult = aa.ValidationResult;
+
+    // Re-export gas utilities
+    pub const GasEstimator = aa.GasEstimator;
+    pub const GasPrices = aa.GasPrices;
+    pub const GasOverhead = aa.GasOverhead;
+
+    // Re-export utilities
+    pub const UserOpHash = aa.UserOpHash;
+    pub const PackedUserOperation = aa.PackedUserOperation;
+};
+
 test {
     std.testing.refAllDecls(@This());
 }
