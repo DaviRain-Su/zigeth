@@ -1,5 +1,11 @@
 name: Automatic Release on Master
 
+# This workflow creates releases without requiring a PAT token
+# Version updates are included in the tag commit but NOT pushed back to the branch
+# This allows it to work with protected branches that require PRs
+#
+# To update VERSION and build.zig.zon on master, manually create a PR after release
+
 on:
   push:
     branches:
@@ -166,23 +172,27 @@ jobs:
           
           sed -i "s/\.version = \"[^\"]*\"/\.version = \"$VERSION\"/" build.zig.zon
           
-          echo "✅ Updated version to $VERSION in build.zig.zon"
+          # Also update VERSION file
+          echo "$VERSION" > VERSION
           
-          git diff build.zig.zon
+          echo "✅ Updated version to $VERSION in build.zig.zon and VERSION"
+          
+          git diff build.zig.zon VERSION
 
-      - name: Commit and push version update
+      - name: Commit version update (for tag only, not pushed to branch)
         run: |
           NEW_VERSION="${{ needs.determine-release.outputs.new_version }}"
           
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          git add build.zig.zon
+          git add build.zig.zon VERSION
           if git diff --staged --quiet; then
             echo "ℹ️  No version changes to commit"
           else
-            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-            git push
+            git commit -m "chore: bump version to $NEW_VERSION"
+            echo "✅ Version updated in local commit (will be in tag, not pushed to branch)"
+            echo "ℹ️  Skipping push to avoid protected branch issues"
           fi
 
       - name: Create and push tag
@@ -437,46 +447,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  update-version:
-    name: Update Version in Code
-    needs: [determine-release, create-github-release]
-    if: needs.determine-release.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.PAT_TOKEN }}
-          ref: ${{ github.ref_name }}
-          fetch-depth: 0
-
-      - name: Update build.zig.zon version
-        run: |
-          VERSION="${{ needs.determine-release.outputs.version_no_v }}"
-          
-          # Update version in build.zig.zon
-          sed -i "s/\.version = \"[^\"]*\"/\.version = \"$VERSION\"/" build.zig.zon
-          
-          # Update VERSION file
-          echo "$VERSION" > VERSION
-          
-          echo "✅ Updated version to $VERSION"
-
-      - name: Commit and push version update
-        run: |
-          NEW_VERSION="${{ needs.determine-release.outputs.new_version }}"
-          
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git add build.zig.zon VERSION
-          
-          if git diff --staged --quiet; then
-            echo "ℹ️  No changes to commit"
-          else
-            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-            git push origin HEAD:${{ github.ref_name }}
-            echo "✅ Pushed version update to ${{ github.ref_name }}"
-          fi
