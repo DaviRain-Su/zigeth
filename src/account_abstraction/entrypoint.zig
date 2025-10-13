@@ -76,7 +76,7 @@ pub const EntryPoint = struct {
         // Block parameter (latest)
         try params_array.append(.{ .string = "latest" });
 
-        const params = std.json.Value{ .array = try params_array.toOwnedSlice() };
+        const params = std.json.Value{ .array = params_array };
 
         // Make RPC call
         const response = try rpc.call("eth_call", params);
@@ -116,7 +116,7 @@ pub const EntryPoint = struct {
         try tx_obj.put("value", .{ .string = value_hex });
         try params_array.append(.{ .object = tx_obj });
 
-        const params = std.json.Value{ .array = try params_array.toOwnedSlice() };
+        const params = std.json.Value{ .array = params_array };
 
         // Make RPC call
         const response = try rpc.call("eth_sendTransaction", params);

@@ -109,22 +109,30 @@ pub const BundlerClient = struct {
 
         // Convert UserOperation to JSON
         const user_op_json = try types.UserOperationJson.fromUserOperation(self.allocator, user_op);
+        defer user_op_json.deinit(self.allocator);
+
+        // Serialize UserOperation to JSON string
+        var json_string = std.ArrayList(u8).init(self.allocator);
+        defer json_string.deinit();
+        try std.json.stringify(user_op_json, .{}, json_string.writer());
+
+        // Parse JSON string into Value
+        const parsed = try std.json.parseFromSlice(std.json.Value, self.allocator, json_string.items, .{});
+        defer parsed.deinit();
+        const user_op_value = parsed.value;
 
         // Convert EntryPoint address to hex string
         const entry_point_hex = try self.entry_point.toHex(self.allocator);
         defer self.allocator.free(entry_point_hex);
+        const entry_point_value = std.json.Value{ .string = entry_point_hex };
 
         // Build params array: [userOp, entryPoint]
         var params_array = std.ArrayList(std.json.Value).init(self.allocator);
         defer params_array.deinit();
-
-        const user_op_value = try std.json.Value.jsonStringify(user_op_json, .{}, self.allocator);
-        const entry_point_value = std.json.Value{ .string = entry_point_hex };
-
         try params_array.append(user_op_value);
         try params_array.append(entry_point_value);
 
-        const params = std.json.Value{ .array = params_array.items };
+        const params = std.json.Value{ .array = params_array };
 
         // Make RPC call
         const response = try self.rpc_client.call("eth_estimateUserOperationGas", params);

@@ -187,9 +187,10 @@ pub const GasEstimator = struct {
 
     /// Get gas prices from RPC
     fn getGasPricesFromRpc(self: *GasEstimator, rpc: *rpc_mod.RpcClient) !GasPrices {
-        _ = self;
         // Get base fee from latest block
-        const params_empty = std.json.Value{ .array = &[_]std.json.Value{} };
+        const params_empty_list = std.ArrayList(std.json.Value).init(self.allocator);
+        defer params_empty_list.deinit();
+        const params_empty = std.json.Value{ .array = params_empty_list };
 
         // Get eth_gasPrice
         const gas_price_response = try rpc.call("eth_gasPrice", params_empty);

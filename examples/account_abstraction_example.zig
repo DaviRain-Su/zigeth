@@ -1,36 +1,46 @@
 const std = @import("std");
 const zigeth = @import("zigeth");
 
+/// Comprehensive Account Abstraction (ERC-4337) Example
+/// Demonstrates all major features of the AA package
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     std.debug.print("\n", .{});
-    std.debug.print("=" ** 60 ++ "\n", .{});
-    std.debug.print("Zigeth Account Abstraction (ERC-4337) Example\n", .{});
-    std.debug.print("=" ** 60 ++ "\n\n", .{});
+    std.debug.print("=" ** 80 ++ "\n", .{});
+    std.debug.print("      Zigeth Account Abstraction (ERC-4337) - Comprehensive Example\n", .{});
+    std.debug.print("=" ** 80 ++ "\n\n", .{});
 
-    // 1. Show all EntryPoint versions
-    std.debug.print("1. EntryPoint Versions:\n", .{});
+    // ============================================================================
+    // SECTION 1: EntryPoint Versions
+    // ============================================================================
+    std.debug.print("┌─────────────────────────────────────────────────────────────────────────┐\n", .{});
+    std.debug.print("│ SECTION 1: EntryPoint Versions                                         │\n", .{});
+    std.debug.print("└─────────────────────────────────────────────────────────────────────────┘\n\n", .{});
     
-    std.debug.print("   v0.6 (Legacy):\n", .{});
-    std.debug.print("      Address: {s}\n", .{zigeth.account_abstraction.EntryPoint.ENTRYPOINT_V06_ADDRESS});
-    var entry_point_v06 = try zigeth.account_abstraction.EntryPoint.v06(allocator);
-    std.debug.print("      Version: {:?}\n", .{entry_point_v06.version});
+    std.debug.print("   EntryPoint v0.6 (Legacy - Original ERC-4337):\n", .{});
+    std.debug.print("   • Address: {s}\n", .{zigeth.account_abstraction.EntryPoint.ENTRYPOINT_V06_ADDRESS});
+    var entry_point_v06 = try zigeth.account_abstraction.EntryPoint.v06(allocator, null);
+    std.debug.print("   • Version: {}\n", .{entry_point_v06.version});
+    std.debug.print("   • Gas fields: u256 (larger, less efficient)\n\n", .{});
     
-    std.debug.print("   v0.7 (Current - Gas-optimized):\n", .{});
-    std.debug.print("      Address: {s}\n", .{zigeth.account_abstraction.EntryPoint.ENTRYPOINT_V07_ADDRESS});
-    var entry_point_v07 = try zigeth.account_abstraction.EntryPoint.v07(allocator);
-    std.debug.print("      Version: {:?}\n", .{entry_point_v07.version});
+    std.debug.print("   EntryPoint v0.7 (Current - Gas-optimized):\n", .{});
+    std.debug.print("   • Address: {s}\n", .{zigeth.account_abstraction.EntryPoint.ENTRYPOINT_V07_ADDRESS});
+    var entry_point_v07 = try zigeth.account_abstraction.EntryPoint.v07(allocator, null);
+    std.debug.print("   • Version: {}\n", .{entry_point_v07.version});
+    std.debug.print("   • Gas fields: u128 (smaller, more efficient)\n", .{});
+    std.debug.print("   • Separate factory and paymaster fields\n\n", .{});
     
-    std.debug.print("   v0.8 (Future):\n", .{});
-    std.debug.print("      Address: {s}\n", .{zigeth.account_abstraction.EntryPoint.ENTRYPOINT_V08_ADDRESS});
-    var entry_point_v08 = try zigeth.account_abstraction.EntryPoint.v08(allocator);
-    std.debug.print("      Version: {:?}\n\n", .{entry_point_v08.version});
+    std.debug.print("   EntryPoint v0.8 (Latest):\n", .{});
+    std.debug.print("   • Address: {s}\n", .{zigeth.account_abstraction.EntryPoint.ENTRYPOINT_V08_ADDRESS});
+    var entry_point_v08 = try zigeth.account_abstraction.EntryPoint.v08(allocator, null);
+    std.debug.print("   • Version: {}\n", .{entry_point_v08.version});
+    std.debug.print("   • Additional optimizations\n\n", .{});
     
-    // Use v0.7 for rest of example
-    var entry_point = entry_point_v07;
+    // Use v0.7 for rest of example (gas-optimized)
+    const entry_point = entry_point_v07;
 
     // 2. Create Smart Account
     std.debug.print("2. Creating Smart Account...\n", .{});

@@ -35,6 +35,7 @@ pub const BundlerClient = bundler.BundlerClient;
 pub const PaymasterClient = paymaster.PaymasterClient;
 pub const PaymasterMode = paymaster.PaymasterMode;
 pub const TokenQuote = paymaster.TokenQuote;
+pub const PaymasterStub = paymaster.PaymasterStub;
 
 // Re-export smart account
 pub const SmartAccount = smart_account.SmartAccount;
@@ -53,6 +54,7 @@ pub const GasOverhead = gas.GasOverhead;
 
 // Re-export utilities
 pub const UserOpHash = utils.UserOpHash;
+pub const UserOpUtils = utils.UserOpUtils;
 pub const PackedUserOperation = utils.PackedUserOperation;
 
 test {
