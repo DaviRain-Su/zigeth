@@ -32,9 +32,10 @@
 | **⚡ Solidity** | ✅ Production Ready | 15 | Type mappings, Standard interfaces |
 | **⚙️ Middleware** | ✅ Production Ready | 23 | Gas, Nonce, Transaction Signing |
 | **🔑 Wallet** | ✅ Production Ready | 35 | Software, HD, Keystore, Ledger framework |
+| **🎯 Account Abstraction** | ✅ Production Ready | - | ERC-4337 (EntryPoint v0.6/v0.7/v0.8, Bundler, Paymaster) |
 
 ### Overall Progress
-**334/334 tests passing** ✅ | **12/12 modules production-ready** | **7/7 examples working**
+**334/334 tests passing** ✅ | **13/13 modules production-ready** | **9/9 examples working**
 
 ---
 
@@ -43,20 +44,21 @@
 ```
 zigeth/
 ├── src/
-│   ├── primitives/       # ✅ Core data types (Address, Hash, U256, etc.)
-│   ├── types/            # ✅ Protocol types (Transaction, Block, Receipt)
-│   ├── crypto/           # ✅ Keccak-256, secp256k1, ECDSA
-│   ├── abi/              # ✅ ABI encoding/decoding
-│   ├── rlp/              # ✅ RLP encoding/decoding
-│   ├── rpc/              # ✅ JSON-RPC client (eth/net/web3/debug)
-│   ├── providers/        # ✅ HTTP, WebSocket, IPC providers
-│   ├── contract/         # ✅ Smart contract interaction
-│   ├── signer/           # ✅ Wallet management (Software, HD, Keystore)
-│   ├── middleware/       # ✅ Gas, Nonce, Signing automation
-│   ├── sol/              # ✅ Solidity integration
-│   └── utils/            # ✅ Hex, Format, Units, Checksum
+│   ├── primitives/           # ✅ Core data types (Address, Hash, U256, etc.)
+│   ├── types/                # ✅ Protocol types (Transaction, Block, Receipt)
+│   ├── crypto/               # ✅ Keccak-256, secp256k1, ECDSA
+│   ├── abi/                  # ✅ ABI encoding/decoding
+│   ├── rlp/                  # ✅ RLP encoding/decoding
+│   ├── rpc/                  # ✅ JSON-RPC client (eth/net/web3/debug)
+│   ├── providers/            # ✅ HTTP, WebSocket, IPC providers
+│   ├── contract/             # ✅ Smart contract interaction
+│   ├── signer/               # ✅ Wallet management (Software, HD, Keystore)
+│   ├── middleware/           # ✅ Gas, Nonce, Signing automation
+│   ├── account_abstraction/  # ✅ ERC-4337 (EntryPoint, UserOps, Bundler, Paymaster)
+│   ├── sol/                  # ✅ Solidity integration
+│   └── utils/                # ✅ Hex, Format, Units, Checksum
 │
-├── examples/             # ✅ 7 comprehensive examples (1,853 LOC)
+├── examples/             # ✅ 9 comprehensive examples
 │   ├── 01_wallet_creation.zig
 │   ├── 02_query_blockchain.zig
 │   ├── 03_send_transaction.zig
@@ -64,6 +66,8 @@ zigeth/
 │   ├── 05_transaction_receipts.zig
 │   ├── 06_event_monitoring.zig
 │   ├── 07_complete_workflow.zig
+│   ├── 08_account_abstraction.zig    # ✅ ERC-4337 quick test
+│   ├── 09_etherspot_userop.zig       # ✅ Etherspot integration
 │   └── README.md
 │
 ├── build.zig             # Build system
@@ -83,8 +87,9 @@ zigeth/
 - **💼 Wallets**: Software wallets, HD wallets (BIP-32/44), Keystores, Ledger framework
 - **⚙️ Middleware**: Automatic gas/nonce management, transaction signing
 - **⚡ Solidity**: ERC-20, ERC-721, ERC-1155, Ownable, AccessControl interfaces
+- **🎯 Account Abstraction**: ERC-4337 support with EntryPoint v0.6/v0.7/v0.8, bundlers, paymasters
 - **🛠️ Utilities**: Hex encoding, unit conversions, EIP-55/1191 checksums
-- **🎓 Examples**: 7 comprehensive example programs covering all major use cases
+- **🎓 Examples**: 9 comprehensive example programs covering all major use cases
 
 ## 📋 Requirements
 
@@ -97,15 +102,22 @@ zigeth/
   - Wraps Bitcoin Core's audited libsecp256k1
   - Used for ECDSA signing, verification, and public key recovery
 
-## 🚀 Installation
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Zig 0.14.1** or later ([Download](https://ziglang.org/download/))
+- **libc** (standard C library - usually pre-installed)
+
+### Installation
 
 Add zigeth to your `build.zig.zon`:
 
 ```zig
 .dependencies = .{
     .zigeth = .{
-        .url = "https://github.com/ch4r10t33r/zigeth/archive/main.tar.gz",
-        .hash = "...", // Run `zig build` to get the hash
+        .url = "https://github.com/ch4r10t33r/zigeth/archive/v0.2.1.tar.gz",
+        .hash = "...", // Run `zig build` and Zig will provide the hash
     },
 },
 ```
@@ -119,9 +131,17 @@ const zigeth = b.dependency("zigeth", .{
 });
 
 exe.root_module.addImport("zigeth", zigeth.module("zigeth"));
+exe.linkLibC(); // Required for secp256k1
 ```
 
-## 📖 Quick Start
+Then run:
+```bash
+zig build
+```
+
+### Your First Zigeth Program
+
+Create `src/main.zig`:
 
 ```zig
 const std = @import("std");
@@ -132,26 +152,184 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Generate wallet
+    // 1. Create a wallet
     var wallet = try zigeth.signer.Wallet.generate(allocator);
-    const address = try wallet.getAddress();
+    defer wallet.deinit();
     
-    // Connect to network
-    var provider = try zigeth.providers.Networks.mainnet(allocator);
+    const address = try wallet.getAddress();
+    const address_hex = try address.toHex(allocator);
+    defer allocator.free(address_hex);
+    
+    std.debug.print("🔑 New wallet created!\n", .{});
+    std.debug.print("   Address: {s}\n\n", .{address_hex});
+    
+    // 2. Connect to Ethereum (Sepolia testnet)
+    var provider = try zigeth.providers.Networks.sepolia(allocator);
     defer provider.deinit();
     
-    // Query balance
+    std.debug.print("🌐 Connected to Sepolia testnet\n", .{});
+    
+    // 3. Query account balance
     const balance = try provider.getBalance(address);
     const eth = try zigeth.utils.units.weiToEther(balance);
     
-    std.debug.print("Address: {}\n", .{address});
-    std.debug.print("Balance: {d} ETH\n", .{eth});
+    std.debug.print("   Balance: {d} ETH\n\n", .{eth});
+    
+    // 4. Get current block number
+    const block_number = try provider.getBlockNumber();
+    std.debug.print("📦 Current block: {}\n", .{block_number});
+    
+    // 5. Get gas price
+    const gas_price = try provider.getGasPrice();
+    const gwei = gas_price / 1_000_000_000;
+    std.debug.print("⛽ Gas price: {} gwei\n", .{gwei});
 }
 ```
 
+Run it:
+```bash
+zig build run
+```
+
+Output:
+```
+🔑 New wallet created!
+   Address: 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7
+
+🌐 Connected to Sepolia testnet
+   Balance: 0.0 ETH
+
+📦 Current block: 5123456
+⛽ Gas price: 1 gwei
+```
+
+### Common Use Cases
+
+#### 1. Check ETH Balance
+
+```zig
+const address = try zigeth.primitives.Address.fromHex(
+    "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7"
+);
+
+var provider = try zigeth.providers.Networks.mainnet(allocator);
+defer provider.deinit();
+
+const balance = try provider.getBalance(address);
+const eth = try zigeth.utils.units.weiToEther(balance);
+std.debug.print("Balance: {d} ETH\n", .{eth});
+```
+
+#### 2. Send ETH Transaction
+
+```zig
+// Setup signer
+var wallet = try zigeth.signer.Wallet.fromPrivateKeyHex(allocator, private_key);
+defer wallet.deinit();
+
+// Create transaction
+var tx = zigeth.types.Transaction.newEip1559(allocator);
+tx.to = try zigeth.primitives.Address.fromHex("0x...");
+tx.value = zigeth.primitives.U256.fromInt(100_000_000_000_000_000); // 0.1 ETH
+tx.nonce = try provider.getTransactionCount(wallet.address);
+tx.gas_limit = 21000;
+tx.max_fee_per_gas = 30_000_000_000; // 30 gwei
+tx.max_priority_fee_per_gas = 2_000_000_000; // 2 gwei
+tx.chain_id = 11155111; // Sepolia
+
+// Sign and send
+const signed_tx = try wallet.signTransaction(&tx);
+const tx_hash = try provider.sendRawTransaction(signed_tx);
+
+std.debug.print("Transaction sent: {}\n", .{tx_hash});
+```
+
+#### 3. Interact with ERC-20 Token
+
+```zig
+// USDC contract on Ethereum
+const usdc_address = try zigeth.primitives.Address.fromHex(
+    "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+);
+
+// Use built-in ERC-20 interface
+const erc20 = zigeth.sol.ERC20;
+const balance_of = erc20.getFunctionByName("balanceOf").?;
+
+// Encode function call
+const params = [_]zigeth.abi.AbiValue{
+    .{ .address = your_address },
+};
+const call_data = try zigeth.abi.encodeFunctionCall(allocator, balance_of, &params);
+defer allocator.free(call_data);
+
+// Call contract
+const result = try provider.call(.{
+    .to = usdc_address,
+    .data = call_data,
+});
+
+// Decode result (uint256 balance)
+const balance_value = std.mem.readInt(u256, result[0..32], .big);
+const usdc_balance = @as(f64, @floatFromInt(balance_value)) / 1_000_000; // USDC has 6 decimals
+std.debug.print("USDC Balance: {d}\n", .{usdc_balance});
+```
+
+#### 4. Account Abstraction (ERC-4337)
+
+```zig
+const aa = zigeth.account_abstraction;
+
+// Create EntryPoint v0.7 instance
+const entry_point = try aa.EntryPoint.v07(allocator, &rpc);
+
+// Create smart account
+var smart_account = aa.SmartAccount.init(
+    allocator,
+    account_address,
+    entry_point.address,
+    .v0_7,
+    owner_address,
+    &rpc,
+    &factory,
+    0, // salt
+);
+
+// Encode transaction
+const call_data = try smart_account.encodeExecute(recipient, value, &[_]u8{});
+defer allocator.free(call_data);
+
+// Create UserOperation
+const gas_estimates = try gas_estimator.estimateGas(test_op);
+const user_op_any = try smart_account.createUserOperation(call_data, gas_estimates);
+var user_op = user_op_any.v0_7;
+
+// Get paymaster sponsorship (FREE for user!)
+var paymaster = aa.PaymasterClient.init(allocator, paymaster_url, api_key);
+defer paymaster.deinit();
+try paymaster.sponsorUserOperation(&user_op, entry_point.address, .sponsor);
+
+// Sign and send
+const signature = try smart_account.signUserOperation(user_op, private_key);
+user_op.signature = signature;
+
+var bundler = aa.BundlerClient.init(allocator, bundler_url, entry_point.address);
+defer bundler.deinit();
+const user_op_hash = try bundler.sendUserOperation(user_op);
+
+std.debug.print("UserOp sent: {}\n", .{user_op_hash});
+```
+
+### Next Steps
+
+1. **Explore Examples**: Check out the 9 examples in [`examples/`](examples/) directory
+2. **Read API Docs**: See the full API documentation below
+3. **Join Community**: Report issues, request features, contribute!
+4. **Build Something**: Create your Ethereum dApp with Zig!
+
 ## 📚 Examples
 
-The `examples/` directory contains 7 comprehensive programs demonstrating all major features:
+The `examples/` directory contains **9 comprehensive programs** demonstrating all major features:
 
 | Example | Description | Features Demonstrated |
 |---------|-------------|----------------------|
@@ -162,6 +340,8 @@ The `examples/` directory contains 7 comprehensive programs demonstrating all ma
 | **05_transaction_receipts.zig** | Receipt queries | Status, fees, logs, contract addresses |
 | **06_event_monitoring.zig** | WebSocket events | Subscriptions (newHeads, logs, pending txs) |
 | **07_complete_workflow.zig** | End-to-end flow | Complete transaction lifecycle with all components |
+| **08_account_abstraction.zig** | ERC-4337 AA | EntryPoint versions, UserOps, gas estimation, paymasters |
+| **09_etherspot_userop.zig** | Etherspot integration | Complete AA workflow with Arka & Skandha (v0.7) |
 
 ### Running Examples
 
@@ -170,9 +350,10 @@ The `examples/` directory contains 7 comprehensive programs demonstrating all ma
 zig build -Dexamples=true
 
 # Run a specific example
-zig build -Dexamples=true run-01_wallet_creation
-zig build -Dexamples=true run-02_query_blockchain
-zig build -Dexamples=true run-04_smart_contracts
+zig build run-01_wallet_creation -Dexamples=true
+zig build run-02_query_blockchain -Dexamples=true
+zig build run-08_account_abstraction -Dexamples=true
+zig build run-09_etherspot_userop -Dexamples=true
 ```
 
 See [`examples/README.md`](examples/README.md) for detailed documentation of each example.
@@ -496,10 +677,21 @@ All core functionality is **complete** and **production-ready**!
 ### ✅ Phase 5: Production Ready (Complete)
 - ✅ Middleware (Gas, Nonce, Signing)
 - ✅ Wallet management (Software, HD, Keystore)
-- ✅ Comprehensive examples (7 programs)
+- ✅ Account Abstraction (ERC-4337 with multi-version support)
+- ✅ Comprehensive examples (9 programs)
 - ✅ Complete documentation
 - ✅ CI/CD and auto-releases
 - ✅ 334 passing tests
+
+### ✅ Phase 6: Account Abstraction (Complete)
+- ✅ EntryPoint v0.6, v0.7, v0.8 support
+- ✅ UserOperation types and validation
+- ✅ Bundler client (RPC integration)
+- ✅ Paymaster client (sponsorship & ERC-20 payments)
+- ✅ Smart Account management
+- ✅ Gas estimation (local & RPC)
+- ✅ Complete type conversions and serialization
+- ✅ Etherspot integration examples
 
 ## 🚀 Releases & Versioning
 

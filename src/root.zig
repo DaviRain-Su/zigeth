@@ -198,6 +198,18 @@ pub const signer = struct {
     pub const APDU = ledger_mod.APDU;
 };
 
+// Error handling and reporting
+pub const errors = @import("errors.zig");
+pub const ZigethError = errors.ZigethError;
+pub const ErrorContext = errors.ErrorContext;
+pub const ErrorFormatter = errors.ErrorFormatter;
+pub const ErrorReporter = errors.ErrorReporter;
+pub const RpcErrors = errors.RpcErrors;
+pub const TransactionErrors = errors.TransactionErrors;
+pub const ContractErrors = errors.ContractErrors;
+pub const WalletErrors = errors.WalletErrors;
+pub const AccountAbstractionErrors = errors.AccountAbstractionErrors;
+
 pub const utils = struct {
     pub const hex = @import("utils/hex.zig");
     pub const format = @import("utils/format.zig");
