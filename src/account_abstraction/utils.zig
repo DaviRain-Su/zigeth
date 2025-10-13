@@ -31,7 +31,7 @@ pub const UserOpHash = struct {
         defer allocator.free(packed_data);
 
         // Step 2: Hash the packed UserOperation
-        const user_op_hash = try keccak.keccak256(allocator, packed_data);
+        const user_op_hash = keccak.hash(packed_data);
 
         // Step 3: Create final hash: keccak256(userOpHash ++ entryPoint ++ chainId)
         var final_data = std.ArrayList(u8).init(allocator);
@@ -44,7 +44,7 @@ pub const UserOpHash = struct {
         std.mem.writeInt(u64, chain_id_bytes[24..32][0..8], chain_id, .big);
         try final_data.appendSlice(&chain_id_bytes);
 
-        return try keccak.keccak256(allocator, final_data.items);
+        return keccak.hash(final_data.items);
     }
 
     /// Pack UserOperation for hashing (supports all versions)
@@ -63,16 +63,16 @@ pub const UserOpHash = struct {
 
         // Hash initCode or factory data
         if (UserOpType == types.UserOperationV06) {
-            const init_hash = try keccak.keccak256(allocator, user_op.initCode);
+            const init_hash = keccak.hash(user_op.initCode);
             try packed_bytes.appendSlice(&init_hash.bytes);
         } else {
             // v0.7/v0.8: hash factoryData
-            const factory_hash = try keccak.keccak256(allocator, user_op.factoryData);
+            const factory_hash = keccak.hash(user_op.factoryData);
             try packed_bytes.appendSlice(&factory_hash.bytes);
         }
 
         // Hash callData
-        const call_hash = try keccak.keccak256(allocator, user_op.callData);
+        const call_hash = keccak.hash(user_op.callData);
         try packed_bytes.appendSlice(&call_hash.bytes);
 
         // Gas limits (version-specific encoding)
@@ -96,7 +96,7 @@ pub const UserOpHash = struct {
             try packed_bytes.appendSlice(&gas_bytes);
 
             // Hash paymasterAndData
-            const paymaster_hash = try keccak.keccak256(allocator, user_op.paymasterAndData);
+            const paymaster_hash = keccak.hash(user_op.paymasterAndData);
             try packed_bytes.appendSlice(&paymaster_hash.bytes);
         } else {
             // v0.7/v0.8: u128 for most gas fields
@@ -119,7 +119,7 @@ pub const UserOpHash = struct {
             try packed_bytes.appendSlice(&gas_bytes_128);
 
             // Hash paymasterData
-            const paymaster_hash = try keccak.keccak256(allocator, user_op.paymasterData);
+            const paymaster_hash = keccak.hash(user_op.paymasterData);
             try packed_bytes.appendSlice(&paymaster_hash.bytes);
         }
 
