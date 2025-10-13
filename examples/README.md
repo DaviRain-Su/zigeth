@@ -13,6 +13,7 @@ This directory contains comprehensive examples demonstrating the most common Eth
 | **5** | `05_transaction_receipts.zig` | Transaction receipts and status | ⭐⭐ Intermediate |
 | **6** | `06_event_monitoring.zig` | Event monitoring and subscriptions | ⭐⭐⭐ Advanced |
 | **7** | `07_complete_workflow.zig` | Complete end-to-end workflow | ⭐⭐⭐ Advanced |
+| **8** | `08_account_abstraction.zig` | ERC-4337 Account Abstraction (AA) | ⭐⭐⭐ Advanced |
 
 ## 🚀 Running Examples
 
@@ -194,6 +195,48 @@ Learn how to:
 
 **Use cases**: Complete applications, learning the full API
 
+### 8. Account Abstraction (`08_account_abstraction.zig`)
+
+Learn how to:
+- Work with ERC-4337 Account Abstraction
+- Use all three EntryPoint versions (v0.6, v0.7, v0.8)
+- Create and manage smart contract accounts
+- Integrate with bundlers and paymasters
+- Estimate gas for UserOperations
+- Encode single and batch transactions
+- Use paymaster sponsorship
+- Build complete AA workflows
+
+**Topics covered**: 
+- EntryPoint versions and multi-version support
+- UserOperation creation (v0.6, v0.7, v0.8)
+- Smart Account creation with CREATE2
+- Factory-based account deployment
+- Gas estimation (local and RPC)
+- Paymaster integration (SPONSOR and ERC20 modes)
+- Bundler client usage
+- Transaction encoding (execute and executeBatch)
+- Complete sponsored transaction workflow
+
+**Use cases**: 
+- Smart contract wallets
+- Sponsored dApps (gasless transactions)
+- ERC-20 fee payment wallets
+- Multi-signature wallets
+- Social recovery wallets
+- DeFi applications with Account Abstraction
+- Gaming platforms with free transactions
+
+**Key Features Demonstrated**:
+- ✅ Compile-time polymorphism (anytype)
+- ✅ Multi-version UserOperations
+- ✅ Zero runtime overhead
+- ✅ Type-safe bundler/paymaster clients
+- ✅ CREATE2 deterministic addresses
+- ✅ Batch atomic transactions
+- ✅ Paymaster data packing/unpacking
+- ✅ Version conversion (v0.7 → v0.6)
+
 ## 🎯 Common Patterns
 
 ### Pattern 1: Simple Address Creation
@@ -263,6 +306,85 @@ const balance_of = zigeth.abi.Function{
 
 const call_data = try zigeth.abi.encodeFunctionCall(allocator, balance_of, &params);
 // Use provider.eth.call() to execute
+```
+
+### Pattern 5: Account Abstraction - Sponsored Transaction
+
+```zig
+const aa = zigeth.account_abstraction;
+
+// 1. Setup
+const entry_point = try aa.EntryPoint.v07(allocator, &rpc_client);
+var smart_account = aa.SmartAccount.init(
+    allocator,
+    account_address,
+    entry_point.address,
+    .v0_7,
+    owner_address,
+    &rpc_client,
+    &factory,
+    0, // salt
+);
+
+// 2. Create transaction
+const call_data = try smart_account.encodeExecute(
+    recipient_address,
+    value, // Amount in wei
+    &[_]u8{}, // Additional data if needed
+);
+defer allocator.free(call_data);
+
+// 3. Estimate gas
+var gas_estimator = aa.GasEstimator.init(allocator, null, &rpc_client);
+const test_op = aa.UserOpUtils.zero(aa.types.UserOperationV07);
+const gas_estimates = try gas_estimator.estimateGas(test_op);
+
+// 4. Create UserOperation
+const user_op_any = try smart_account.createUserOperation(call_data, gas_estimates);
+var user_op = user_op_any.v07;
+
+// 5. Get paymaster sponsorship (FREE for user!)
+var paymaster = aa.PaymasterClient.init(allocator, paymaster_url, api_key);
+defer paymaster.deinit();
+try paymaster.sponsorUserOperation(&user_op, entry_point.address, .sponsor);
+
+// 6. Sign
+const signature = try smart_account.signUserOperation(user_op, private_key);
+defer allocator.free(signature);
+user_op.signature = signature;
+
+// 7. Send to bundler
+var bundler = aa.BundlerClient.init(allocator, bundler_url, entry_point.address);
+defer bundler.deinit();
+const user_op_hash = try bundler.sendUserOperation(user_op);
+
+// 8. Wait for execution
+const receipt = try bundler.getUserOperationReceipt(user_op_hash);
+std.debug.print("Success: {}\n", .{receipt.?.success});
+```
+
+### Pattern 6: Account Abstraction - Batch Transactions
+
+```zig
+// Execute multiple calls atomically
+const batch_calls = [_]aa.Call{
+    .{
+        .to = usdc_address,
+        .value = 0,
+        .data = try encodeApprove(spender, amount), // Approve USDC
+    },
+    .{
+        .to = dex_address,
+        .value = 0,
+        .data = try encodeSwap(usdc_address, eth_address, amount), // Swap on DEX
+    },
+};
+
+const call_data = try smart_account.encodeExecuteBatch(&batch_calls);
+defer allocator.free(call_data);
+
+// Create UserOperation and send (same as Pattern 5)
+// If one call fails, entire batch reverts (atomic)
 ```
 
 ## ⚠️ Important Notes
@@ -339,6 +461,15 @@ zigeth.signer.Wallet
 5. Study `05_transaction_receipts.zig` - Understand receipts
 6. Experiment with `06_event_monitoring.zig` - Real-time events
 7. Master `07_complete_workflow.zig` - Put it all together
+8. **Advanced**: `08_account_abstraction.zig` - ERC-4337 and smart accounts
+
+**Alternative path for Account Abstraction developers:**
+
+1. `01_wallet_creation.zig` - Understand EOA (Externally Owned Accounts)
+2. `02_query_blockchain.zig` - Learn blockchain queries
+3. `08_account_abstraction.zig` - Jump into smart contract accounts
+4. `04_smart_contracts.zig` - Understand contract interactions (AA uses these!)
+5. `07_complete_workflow.zig` - Traditional workflow comparison
 
 ## 🌐 Multi-Chain Support
 
@@ -395,11 +526,21 @@ Have a useful example? Contributions are welcome!
 
 ## 🔗 Additional Resources
 
+### General Ethereum Development
 - [Zigeth Documentation](../README.md)
 - [Zig Language](https://ziglang.org/learn/)
 - [Ethereum Documentation](https://ethereum.org/en/developers/)
 - [Etherspot RPC](https://etherspot.io/)
 - [EIP Specifications](https://eips.ethereum.org/)
+
+### Account Abstraction (ERC-4337)
+- [EIP-4337 Specification](https://eips.ethereum.org/EIPS/eip-4337) - Official ERC-4337 standard
+- [Account Abstraction README](../src/account_abstraction/README.md) - Zigeth AA package documentation
+- [eth-infinitism/account-abstraction](https://github.com/eth-infinitism/account-abstraction) - Reference Solidity contracts
+- [Viem Account Abstraction](https://viem.sh/account-abstraction) - TypeScript reference
+- [Etherspot Skandha](https://github.com/etherspot/skandha) - Open-source bundler
+- [Etherspot Arka](https://github.com/etherspot/arka) - Open-source paymaster
+- [ERC-4337 Resources](https://www.erc4337.io/) - Community resources
 
 ## 📞 Support
 

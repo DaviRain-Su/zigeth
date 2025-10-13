@@ -250,6 +250,7 @@ pub const account_abstraction = struct {
     pub const BundlerClient = aa.BundlerClient;
     pub const PaymasterClient = aa.PaymasterClient;
     pub const PaymasterMode = aa.PaymasterMode;
+    pub const PaymasterStub = aa.PaymasterStub;
     pub const TokenQuote = aa.TokenQuote;
 
     // Re-export smart account types
@@ -268,6 +269,7 @@ pub const account_abstraction = struct {
     pub const GasOverhead = aa.GasOverhead;
 
     // Re-export utilities
+    pub const UserOpUtils = aa.UserOpUtils;
     pub const UserOpHash = aa.UserOpHash;
     pub const PackedUserOperation = aa.PackedUserOperation;
 };

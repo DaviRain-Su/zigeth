@@ -26,18 +26,19 @@ pub const UserOperationV06 = struct {
     signature: []const u8,
 
     /// Calculate UserOperation hash for signing
-    pub fn hash(self: UserOperation, allocator: std.mem.Allocator, entry_point: primitives.Address, chain_id: u64) !Hash {
-        _ = self;
-        _ = allocator;
-        _ = entry_point;
-        _ = chain_id;
-        // TODO: Implement proper UserOperation hash calculation
-        // Following EIP-4337 specification
-        return Hash{};
+    pub fn hash(self: UserOperationV06, allocator: std.mem.Allocator, entry_point: primitives.Address, chain_id: u64) !Hash {
+        // Use the utils module for hash calculation
+        const utils = @import("utils.zig");
+        return try utils.UserOpHash.calculate(
+            allocator,
+            self,
+            entry_point,
+            chain_id,
+        );
     }
 
     /// Validate UserOperation fields
-    pub fn validate(self: UserOperation) !void {
+    pub fn validate(self: UserOperationV06) !void {
         if (self.sender.isZero()) {
             return error.InvalidSender;
         }
@@ -76,21 +77,53 @@ pub const UserOperationV07 = struct {
 
     /// Convert to v0.6 format
     pub fn toV06(self: UserOperationV07, allocator: std.mem.Allocator) !UserOperationV06 {
-        // TODO: Implement conversion
-        // - Combine factory + factoryData into initCode
-        // - Combine paymaster fields into paymasterAndData
-        _ = allocator;
+        // Combine factory + factoryData into initCode
+        var init_code = std.ArrayList(u8).init(allocator);
+        errdefer init_code.deinit();
+
+        if (self.factory) |factory| {
+            // Format: factory_address (20 bytes) ++ factoryData
+            try init_code.appendSlice(&factory.bytes);
+            try init_code.appendSlice(self.factoryData);
+        }
+
+        const init_code_slice = try init_code.toOwnedSlice();
+
+        // Combine paymaster fields into paymasterAndData
+        var paymaster_and_data = std.ArrayList(u8).init(allocator);
+        errdefer paymaster_and_data.deinit();
+
+        if (self.paymaster) |paymaster| {
+            // Format: paymaster_address (20 bytes) ++ verificationGasLimit (16 bytes) ++ postOpGasLimit (16 bytes) ++ paymasterData
+            try paymaster_and_data.appendSlice(&paymaster.bytes);
+
+            // Encode verification gas limit (u128, 16 bytes)
+            var ver_gas_bytes: [16]u8 = undefined;
+            std.mem.writeInt(u128, &ver_gas_bytes, self.paymasterVerificationGasLimit, .big);
+            try paymaster_and_data.appendSlice(&ver_gas_bytes);
+
+            // Encode post-op gas limit (u128, 16 bytes)
+            var post_gas_bytes: [16]u8 = undefined;
+            std.mem.writeInt(u128, &post_gas_bytes, self.paymasterPostOpGasLimit, .big);
+            try paymaster_and_data.appendSlice(&post_gas_bytes);
+
+            // Append paymaster-specific data
+            try paymaster_and_data.appendSlice(self.paymasterData);
+        }
+
+        const paymaster_and_data_slice = try paymaster_and_data.toOwnedSlice();
+
         return UserOperationV06{
             .sender = self.sender,
             .nonce = self.nonce,
-            .initCode = &[_]u8{},
+            .initCode = init_code_slice,
             .callData = self.callData,
-            .callGasLimit = self.callGasLimit,
-            .verificationGasLimit = self.verificationGasLimit,
+            .callGasLimit = @intCast(self.callGasLimit),
+            .verificationGasLimit = @intCast(self.verificationGasLimit),
             .preVerificationGas = self.preVerificationGas,
-            .maxFeePerGas = self.maxFeePerGas,
-            .maxPriorityFeePerGas = self.maxPriorityFeePerGas,
-            .paymasterAndData = &[_]u8{},
+            .maxFeePerGas = @intCast(self.maxFeePerGas),
+            .maxPriorityFeePerGas = @intCast(self.maxPriorityFeePerGas),
+            .paymasterAndData = paymaster_and_data_slice,
             .signature = self.signature,
         };
     }
@@ -169,43 +202,148 @@ pub const UserOperationJson = struct {
     paymasterAndData: []const u8,
     signature: []const u8,
 
-    /// Convert from UserOperation (v0.6) to JSON format
-    pub fn fromUserOperation(allocator: std.mem.Allocator, user_op: UserOperationV06) !UserOperationJson {
-        _ = allocator;
-        _ = user_op;
-        // TODO: Implement conversion
+    /// Convert from UserOperation (any version) to JSON format
+    /// Supports v0.6, v0.7, and v0.8
+    pub fn fromUserOperation(allocator: std.mem.Allocator, user_op: anytype) !UserOperationJson {
+        const UserOpType = @TypeOf(user_op);
+        comptime {
+            if (UserOpType != UserOperationV06 and
+                UserOpType != UserOperationV07 and
+                UserOpType != UserOperationV08)
+            {
+                @compileError("user_op must be UserOperationV06, V07, or V08");
+            }
+        }
+
+        // Convert address to hex string
+        const sender_hex = try user_op.sender.toHex(allocator);
+
+        // Convert nonce to hex string
+        const nonce_hex = try std.fmt.allocPrint(allocator, "0x{x}", .{user_op.nonce});
+
+        // Convert call data to hex
+        const call_data_hex = try bytesToHex(allocator, user_op.callData);
+        const signature_hex = try bytesToHex(allocator, user_op.signature);
+
+        // Version-specific field handling
+        var init_code_hex: []const u8 = undefined;
+        var paymaster_and_data_hex: []const u8 = undefined;
+
+        if (UserOpType == UserOperationV06) {
+            // v0.6: direct fields
+            init_code_hex = try bytesToHex(allocator, user_op.initCode);
+            paymaster_and_data_hex = try bytesToHex(allocator, user_op.paymasterAndData);
+        } else {
+            // v0.7/v0.8: need to combine fields
+            // Combine factory + factoryData into initCode
+            if (user_op.factory) |factory| {
+                var init_code_data = std.ArrayList(u8).init(allocator);
+                errdefer init_code_data.deinit();
+                try init_code_data.appendSlice(&factory.bytes);
+                try init_code_data.appendSlice(user_op.factoryData);
+                const init_code_bytes = try init_code_data.toOwnedSlice();
+                defer allocator.free(init_code_bytes);
+                init_code_hex = try bytesToHex(allocator, init_code_bytes);
+            } else {
+                init_code_hex = try bytesToHex(allocator, &[_]u8{});
+            }
+
+            // Combine paymaster fields into paymasterAndData
+            if (user_op.paymaster) |paymaster| {
+                var paymaster_data = std.ArrayList(u8).init(allocator);
+                errdefer paymaster_data.deinit();
+                try paymaster_data.appendSlice(&paymaster.bytes);
+
+                // Add verification gas limit (16 bytes, u128)
+                var ver_gas_bytes: [16]u8 = undefined;
+                std.mem.writeInt(u128, &ver_gas_bytes, user_op.paymasterVerificationGasLimit, .big);
+                try paymaster_data.appendSlice(&ver_gas_bytes);
+
+                // Add post-op gas limit (16 bytes, u128)
+                var post_gas_bytes: [16]u8 = undefined;
+                std.mem.writeInt(u128, &post_gas_bytes, user_op.paymasterPostOpGasLimit, .big);
+                try paymaster_data.appendSlice(&post_gas_bytes);
+
+                // Add paymaster-specific data
+                try paymaster_data.appendSlice(user_op.paymasterData);
+
+                const paymaster_bytes = try paymaster_data.toOwnedSlice();
+                defer allocator.free(paymaster_bytes);
+                paymaster_and_data_hex = try bytesToHex(allocator, paymaster_bytes);
+            } else {
+                paymaster_and_data_hex = try bytesToHex(allocator, &[_]u8{});
+            }
+        }
+
+        // Convert gas values to hex strings
+        const call_gas_hex = try std.fmt.allocPrint(allocator, "0x{x}", .{user_op.callGasLimit});
+        const verification_gas_hex = try std.fmt.allocPrint(allocator, "0x{x}", .{user_op.verificationGasLimit});
+        const pre_verification_gas_hex = try std.fmt.allocPrint(allocator, "0x{x}", .{user_op.preVerificationGas});
+        const max_fee_hex = try std.fmt.allocPrint(allocator, "0x{x}", .{user_op.maxFeePerGas});
+        const max_priority_hex = try std.fmt.allocPrint(allocator, "0x{x}", .{user_op.maxPriorityFeePerGas});
+
         return UserOperationJson{
-            .sender = "",
-            .nonce = "",
-            .initCode = "",
-            .callData = "",
-            .callGasLimit = "",
-            .verificationGasLimit = "",
-            .preVerificationGas = "",
-            .maxFeePerGas = "",
-            .maxPriorityFeePerGas = "",
-            .paymasterAndData = "",
-            .signature = "",
+            .sender = sender_hex,
+            .nonce = nonce_hex,
+            .initCode = init_code_hex,
+            .callData = call_data_hex,
+            .callGasLimit = call_gas_hex,
+            .verificationGasLimit = verification_gas_hex,
+            .preVerificationGas = pre_verification_gas_hex,
+            .maxFeePerGas = max_fee_hex,
+            .maxPriorityFeePerGas = max_priority_hex,
+            .paymasterAndData = paymaster_and_data_hex,
+            .signature = signature_hex,
         };
+    }
+
+    pub fn deinit(self: UserOperationJson, allocator: std.mem.Allocator) void {
+        allocator.free(self.sender);
+        allocator.free(self.nonce);
+        allocator.free(self.initCode);
+        allocator.free(self.callData);
+        allocator.free(self.callGasLimit);
+        allocator.free(self.verificationGasLimit);
+        allocator.free(self.preVerificationGas);
+        allocator.free(self.maxFeePerGas);
+        allocator.free(self.maxPriorityFeePerGas);
+        allocator.free(self.paymasterAndData);
+        allocator.free(self.signature);
     }
 
     /// Convert from JSON format to UserOperation (v0.6)
     pub fn toUserOperation(self: UserOperationJson, allocator: std.mem.Allocator) !UserOperationV06 {
-        _ = self;
-        _ = allocator;
-        // TODO: Implement conversion
+        // Parse address from hex
+        const sender = try primitives.Address.fromHex(self.sender);
+
+        // Parse nonce from hex
+        const nonce = try parseHexU256(self.nonce);
+
+        // Parse bytes from hex
+        const init_code = try hexToBytes(allocator, self.initCode);
+        const call_data = try hexToBytes(allocator, self.callData);
+        const paymaster_and_data = try hexToBytes(allocator, self.paymasterAndData);
+        const signature = try hexToBytes(allocator, self.signature);
+
+        // Parse gas values from hex
+        const call_gas_limit = try parseHexU256(self.callGasLimit);
+        const verification_gas_limit = try parseHexU256(self.verificationGasLimit);
+        const pre_verification_gas = try parseHexU256(self.preVerificationGas);
+        const max_fee_per_gas = try parseHexU256(self.maxFeePerGas);
+        const max_priority_fee_per_gas = try parseHexU256(self.maxPriorityFeePerGas);
+
         return UserOperationV06{
-            .sender = primitives.Address.fromBytes([_]u8{0} ** 20),
-            .nonce = 0,
-            .initCode = &[_]u8{},
-            .callData = &[_]u8{},
-            .callGasLimit = 0,
-            .verificationGasLimit = 0,
-            .preVerificationGas = 0,
-            .maxFeePerGas = 0,
-            .maxPriorityFeePerGas = 0,
-            .paymasterAndData = &[_]u8{},
-            .signature = &[_]u8{},
+            .sender = sender,
+            .nonce = nonce,
+            .initCode = init_code,
+            .callData = call_data,
+            .callGasLimit = call_gas_limit,
+            .verificationGasLimit = verification_gas_limit,
+            .preVerificationGas = pre_verification_gas,
+            .maxFeePerGas = max_fee_per_gas,
+            .maxPriorityFeePerGas = max_priority_fee_per_gas,
+            .paymasterAndData = paymaster_and_data,
+            .signature = signature,
         };
     }
 };
@@ -239,28 +377,69 @@ pub const Log = struct {
 /// Paymaster data structure
 pub const PaymasterData = struct {
     paymaster: primitives.Address,
-    paymasterVerificationGasLimit: u256,
-    paymasterPostOpGasLimit: u256,
-    paymasterData: []const u8,
+    verificationGasLimit: u256,
+    postOpGasLimit: u256,
+    data: []const u8,
 
-    /// Pack paymaster data into bytes
+    /// Pack paymaster data into bytes (v0.7+ format)
+    /// Format: paymaster_address (20 bytes) + verificationGasLimit (16 bytes) + postOpGasLimit (16 bytes) + data
     pub fn pack(self: PaymasterData, allocator: std.mem.Allocator) ![]u8 {
-        _ = self;
-        _ = allocator;
-        // TODO: Implement packing
-        return &[_]u8{};
+        var packed_data = std.ArrayList(u8).init(allocator);
+        errdefer packed_data.deinit();
+
+        // Paymaster address (20 bytes)
+        try packed_data.appendSlice(&self.paymaster.bytes);
+
+        // Verification gas limit (16 bytes, u128)
+        var ver_gas_bytes: [16]u8 = undefined;
+        const ver_gas_u128: u128 = @intCast(self.verificationGasLimit);
+        std.mem.writeInt(u128, &ver_gas_bytes, ver_gas_u128, .big);
+        try packed_data.appendSlice(&ver_gas_bytes);
+
+        // Post-op gas limit (16 bytes, u128)
+        var post_gas_bytes: [16]u8 = undefined;
+        const post_gas_u128: u128 = @intCast(self.postOpGasLimit);
+        std.mem.writeInt(u128, &post_gas_bytes, post_gas_u128, .big);
+        try packed_data.appendSlice(&post_gas_bytes);
+
+        // Paymaster-specific data
+        try packed_data.appendSlice(self.data);
+
+        return try packed_data.toOwnedSlice();
     }
 
-    /// Unpack paymaster data from bytes
+    /// Unpack paymaster data from bytes (v0.7+ format)
     pub fn unpack(data: []const u8, allocator: std.mem.Allocator) !PaymasterData {
-        _ = data;
-        _ = allocator;
-        // TODO: Implement unpacking
+        if (data.len < 52) {
+            return error.InvalidPaymasterData;
+        }
+
+        // Extract paymaster address (20 bytes)
+        var paymaster_bytes: [20]u8 = undefined;
+        @memcpy(&paymaster_bytes, data[0..20]);
+        const paymaster = primitives.Address.fromBytes(paymaster_bytes);
+
+        // Extract verification gas limit (16 bytes, u128)
+        var ver_gas_bytes: [16]u8 = undefined;
+        @memcpy(&ver_gas_bytes, data[20..36]);
+        const ver_gas_limit: u256 = std.mem.readInt(u128, &ver_gas_bytes, .big);
+
+        // Extract post-op gas limit (16 bytes, u128)
+        var post_gas_bytes: [16]u8 = undefined;
+        @memcpy(&post_gas_bytes, data[36..52]);
+        const post_gas_limit: u256 = std.mem.readInt(u128, &post_gas_bytes, .big);
+
+        // Extract remaining data
+        const pm_data = if (data.len > 52)
+            try allocator.dupe(u8, data[52..])
+        else
+            &[_]u8{};
+
         return PaymasterData{
-            .paymaster = primitives.Address.fromBytes([_]u8{0} ** 20),
-            .paymasterVerificationGasLimit = 0,
-            .paymasterPostOpGasLimit = 0,
-            .paymasterData = &[_]u8{},
+            .paymaster = paymaster,
+            .verificationGasLimit = ver_gas_limit,
+            .postOpGasLimit = post_gas_limit,
+            .data = pm_data,
         };
     }
 };
@@ -273,3 +452,57 @@ pub const GasEstimates = struct {
     paymasterVerificationGasLimit: ?u256 = null,
     paymasterPostOpGasLimit: ?u256 = null,
 };
+
+// Helper functions for hex conversion
+
+/// Convert bytes to hex string with "0x" prefix
+fn bytesToHex(allocator: std.mem.Allocator, bytes: []const u8) ![]const u8 {
+    if (bytes.len == 0) {
+        return try allocator.dupe(u8, "0x");
+    }
+
+    const hex = try std.fmt.allocPrint(allocator, "0x{s}", .{std.fmt.fmtSliceHexLower(bytes)});
+    return hex;
+}
+
+/// Convert hex string to bytes
+fn hexToBytes(allocator: std.mem.Allocator, hex_str: []const u8) ![]u8 {
+    // Remove "0x" prefix if present
+    const hex = if (std.mem.startsWith(u8, hex_str, "0x"))
+        hex_str[2..]
+    else
+        hex_str;
+
+    // Empty string = empty bytes
+    if (hex.len == 0) {
+        return try allocator.dupe(u8, &[_]u8{});
+    }
+
+    if (hex.len % 2 != 0) {
+        return error.InvalidHexLength;
+    }
+
+    const byte_len = hex.len / 2;
+    const bytes = try allocator.alloc(u8, byte_len);
+    errdefer allocator.free(bytes);
+
+    for (0..byte_len) |i| {
+        bytes[i] = try std.fmt.parseInt(u8, hex[i * 2 .. i * 2 + 2], 16);
+    }
+
+    return bytes;
+}
+
+/// Parse hex string to u256
+fn parseHexU256(hex_str: []const u8) !u256 {
+    const hex = if (std.mem.startsWith(u8, hex_str, "0x"))
+        hex_str[2..]
+    else
+        hex_str;
+
+    if (hex.len == 0) {
+        return 0;
+    }
+
+    return try std.fmt.parseInt(u256, hex, 16);
+}
