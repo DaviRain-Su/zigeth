@@ -161,7 +161,8 @@ jobs:
           echo "## 📊 Project Status" >> /tmp/changelog.md
           echo "- ✅ 334 tests passing" >> /tmp/changelog.md
           echo "- ✅ 100% feature complete" >> /tmp/changelog.md
-          echo "- ✅ 12/12 modules production-ready" >> /tmp/changelog.md
+          echo "- ✅ 13/13 modules production-ready" >> /tmp/changelog.md
+          echo "- ✅ ERC-4337 Account Abstraction support" >> /tmp/changelog.md
           echo "- ✅ Integrated with Etherspot v2 API" >> /tmp/changelog.md
           
           cat /tmp/changelog.md
@@ -365,7 +366,8 @@ jobs:
           
           - ✅ **334 tests passing**
           - ✅ **100% feature complete**
-          - ✅ **12/12 modules production-ready**
+          - ✅ **13/13 modules production-ready**
+          - ✅ **ERC-4337 Account Abstraction support**
           - ✅ **Integrated with Etherspot v2 API**
           
           ### Modules
@@ -384,6 +386,7 @@ jobs:
           | ⚡ Solidity | ✅ | 15 | Type mappings, Interfaces |
           | ⚙️ Middleware | ✅ | 23 | Gas, Nonce, Signing |
           | 🔑 Wallets | ✅ | 35 | Software, HD, Keystore, Ledger |
+          | 🎯 Account Abstraction | ✅ | - | ERC-4337 v0.6/v0.7/v0.8, Bundler, Paymaster |
           
           ## 🚀 Quick Start
           

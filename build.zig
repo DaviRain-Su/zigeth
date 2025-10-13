@@ -138,6 +138,7 @@ pub fn build(b: *std.Build) void {
             "07_complete_workflow",
             "08_account_abstraction",
             "09_etherspot_userop",
+            "10_error_handling",
         };
 
         for (example_names) |example_name| {
