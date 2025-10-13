@@ -1,0 +1,95 @@
+name: Create Version Update PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update to (e.g., 0.2.2 without v prefix)'
+        required: true
+        type: string
+
+jobs:
+  create-pr:
+    name: Create Version Update PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create version update branch
+        run: |
+          VERSION="${{ inputs.version }}"
+          BRANCH_NAME="chore/bump-version-$VERSION"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git checkout -b "$BRANCH_NAME"
+          echo "✅ Created branch: $BRANCH_NAME"
+
+      - name: Update version files
+        run: |
+          VERSION="${{ inputs.version }}"
+          
+          # Update build.zig.zon
+          sed -i "s/\.version = \"[^\"]*\"/\.version = \"$VERSION\"/" build.zig.zon
+          
+          # Update VERSION file
+          echo "$VERSION" > VERSION
+          
+          echo "✅ Updated version to $VERSION"
+          git diff build.zig.zon VERSION
+
+      - name: Commit changes
+        run: |
+          VERSION="${{ inputs.version }}"
+          
+          git add build.zig.zon VERSION
+          git commit -m "chore: bump version to v$VERSION
+
+This updates the version files after the v$VERSION release was created.
+
+- Updated build.zig.zon to version $VERSION
+- Updated VERSION file to $VERSION"
+          
+          echo "✅ Changes committed"
+
+      - name: Push branch
+        run: |
+          VERSION="${{ inputs.version }}"
+          BRANCH_NAME="chore/bump-version-$VERSION"
+          
+          git push origin "$BRANCH_NAME"
+          echo "✅ Pushed branch: $BRANCH_NAME"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/bump-version-${{ inputs.version }}
+          title: "chore: bump version to v${{ inputs.version }}"
+          body: |
+            ## Version Update
+            
+            This PR updates the version files after the v${{ inputs.version }} release was created.
+            
+            ### Changes
+            - ✅ Updated `build.zig.zon` to version `${{ inputs.version }}`
+            - ✅ Updated `VERSION` file to `${{ inputs.version }}`
+            
+            ### Context
+            The auto-release workflow created the v${{ inputs.version }} tag and GitHub release.
+            This PR syncs the version files on the master branch.
+            
+            **Note**: This is automatically generated after a release.
+          labels: |
+            chore
+            version-bump
+            automated
+          assignees: ${{ github.actor }}
+
