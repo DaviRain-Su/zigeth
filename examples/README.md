@@ -14,6 +14,7 @@ This directory contains comprehensive examples demonstrating the most common Eth
 | **6** | `06_event_monitoring.zig` | Event monitoring and subscriptions | ⭐⭐⭐ Advanced |
 | **7** | `07_complete_workflow.zig` | Complete end-to-end workflow | ⭐⭐⭐ Advanced |
 | **8** | `08_account_abstraction.zig` | ERC-4337 Account Abstraction (AA) | ⭐⭐⭐ Advanced |
+| **9** | `09_etherspot_userop.zig` | Etherspot UserOperation with v0.7 | ⭐⭐⭐ Advanced |
 
 ## 🚀 Running Examples
 
@@ -200,42 +201,85 @@ Learn how to:
 Learn how to:
 - Work with ERC-4337 Account Abstraction
 - Use all three EntryPoint versions (v0.6, v0.7, v0.8)
-- Create and manage smart contract accounts
-- Integrate with bundlers and paymasters
-- Estimate gas for UserOperations
-- Encode single and batch transactions
-- Use paymaster sponsorship
-- Build complete AA workflows
+- Create UserOperations for different versions
+- Validate and size UserOperations
+- Use gas estimators and paymaster modes
+- Initialize account factories
+- Understand gas overhead constants
 
 **Topics covered**: 
-- EntryPoint versions and multi-version support
-- UserOperation creation (v0.6, v0.7, v0.8)
-- Smart Account creation with CREATE2
-- Factory-based account deployment
-- Gas estimation (local and RPC)
-- Paymaster integration (SPONSOR and ERC20 modes)
-- Bundler client usage
-- Transaction encoding (execute and executeBatch)
-- Complete sponsored transaction workflow
+- EntryPoint versions (v0.6, v0.7, v0.8) and addresses
+- UserOperation creation and validation
+- Multi-version support via compile-time polymorphism
+- Gas estimation (local mode)
+- Paymaster modes (SPONSOR and ERC20)
+- Account factory initialization
+- Size comparison (v0.6 vs v0.7 - gas optimization)
 
 **Use cases**: 
-- Smart contract wallets
-- Sponsored dApps (gasless transactions)
-- ERC-20 fee payment wallets
-- Multi-signature wallets
-- Social recovery wallets
+- Quick validation of AA library functionality
+- Learning EntryPoint versions and differences
+- Understanding UserOperation structure
+- Testing gas estimation
+- Exploring paymaster integration
+- Smart contract wallet development
 - DeFi applications with Account Abstraction
-- Gaming platforms with free transactions
 
 **Key Features Demonstrated**:
-- ✅ Compile-time polymorphism (anytype)
-- ✅ Multi-version UserOperations
-- ✅ Zero runtime overhead
-- ✅ Type-safe bundler/paymaster clients
+- ✅ All 3 EntryPoint versions
+- ✅ Multi-version UserOperation support
+- ✅ Compile-time type validation
+- ✅ Gas overhead constants
+- ✅ Paymaster modes
+- ✅ Account factory pattern
+- ✅ Size optimization (v0.7: 148 bytes vs v0.6: 212 bytes)
+
+### 9. Etherspot UserOperation (`09_etherspot_userop.zig`)
+
+Learn how to:
+- Use Etherspot's Modular Smart Account Factory
+- Create a UserOperation for EntryPoint v0.7
+- Integrate with Etherspot Arka Paymaster
+- Submit to Etherspot Skandha Bundler
+- Build complete sponsored transaction workflow
+- Calculate CREATE2 addresses
+- Encode transactions and sign UserOperations
+- Poll for transaction receipts
+
+**Topics covered**: 
+- Etherspot infrastructure (Factory, Arka, Skandha)
+- EntryPoint v0.7 integration
+- Modular Smart Account deployment
+- Paymaster sponsorship (gasless transactions)
+- UserOperation creation and signing
+- JSON-RPC communication
+- Complete end-to-end workflow
+
+**Use cases**: 
+- Building dApps with Etherspot infrastructure
+- Sponsored transactions (no gas fees for users)
+- Smart contract wallet integration
+- Production AA implementations
+- Multi-chain deployment (Etherspot supports many networks)
+- Enterprise-grade AA solutions
+
+**Key Features Demonstrated**:
+- ✅ Etherspot Modular Smart Account Factory
+- ✅ EntryPoint v0.7 (gas-optimized)
+- ✅ Arka Paymaster integration (pm_sponsorUserOperation)
+- ✅ Skandha Bundler submission (eth_sendUserOperation)
 - ✅ CREATE2 deterministic addresses
-- ✅ Batch atomic transactions
-- ✅ Paymaster data packing/unpacking
-- ✅ Version conversion (v0.7 → v0.6)
+- ✅ Complete UserOp lifecycle
+- ✅ JSON serialization for RPC
+- ✅ Production-ready workflow
+
+**Configuration**:
+- **Network**: Sepolia Testnet (Chain ID: 11155111)
+- **EntryPoint v0.7**: `0x0000000071727De22E5E9d8BAf0edAc6f37da032`
+- **Factory**: `0x7f6d8F107fE8551160BD5351d5F1514320aB6E50` (Etherspot Modular)
+- **Paymaster**: `0x00000000000De1aaB9389285965F49D387000000` (Arka)
+- **Bundler RPC**: `https://sepolia-bundler.etherspot.io/v2` (Skandha)
+- **Paymaster RPC**: `https://arka.etherspot.io` (Arka API)
 
 ## 🎯 Common Patterns
 
@@ -462,14 +506,22 @@ zigeth.signer.Wallet
 6. Experiment with `06_event_monitoring.zig` - Real-time events
 7. Master `07_complete_workflow.zig` - Put it all together
 8. **Advanced**: `08_account_abstraction.zig` - ERC-4337 and smart accounts
+9. **Production**: `09_etherspot_userop.zig` - Real-world AA with Etherspot
 
 **Alternative path for Account Abstraction developers:**
 
 1. `01_wallet_creation.zig` - Understand EOA (Externally Owned Accounts)
 2. `02_query_blockchain.zig` - Learn blockchain queries
-3. `08_account_abstraction.zig` - Jump into smart contract accounts
-4. `04_smart_contracts.zig` - Understand contract interactions (AA uses these!)
-5. `07_complete_workflow.zig` - Traditional workflow comparison
+3. `08_account_abstraction.zig` - Learn AA fundamentals
+4. `09_etherspot_userop.zig` - Production AA with Etherspot infrastructure
+5. `04_smart_contracts.zig` - Understand contract interactions (AA uses these!)
+6. `07_complete_workflow.zig` - Traditional workflow comparison
+
+**Fast track for Etherspot developers:**
+
+1. `08_account_abstraction.zig` - Understand ERC-4337 basics
+2. `09_etherspot_userop.zig` - Complete Etherspot integration
+3. Start building your sponsored dApp!
 
 ## 🌐 Multi-Chain Support
 
