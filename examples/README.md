@@ -20,7 +20,7 @@ This directory contains comprehensive examples demonstrating the most common Eth
 
 ### Prerequisites
 
-1. **Install Zig 0.14.1 or later**
+1. **Install Zig 0.15.0 or later**
    ```bash
    # Download from https://ziglang.org/download/
    ```

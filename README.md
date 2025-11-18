@@ -4,7 +4,7 @@
   # Zigeth
   
   [![CI](https://github.com/ch4r10t33r/zigeth/actions/workflows/ci.yml/badge.svg)](https://github.com/ch4r10t33r/zigeth/actions/workflows/ci.yml)
-  [![Zig](https://img.shields.io/badge/Zig-0.14.1-orange.svg)](https://ziglang.org/)
+  [![Zig](https://img.shields.io/badge/Zig-0.15.0-orange.svg)](https://ziglang.org/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
   [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/ch4r10t33r/zigeth/releases)
   
@@ -93,7 +93,7 @@ zigeth/
 
 ## 📋 Requirements
 
-- **Zig 0.14.1** or later
+- **Zig 0.15.0** or later
 - **libc** (standard C library)
 
 ## 📦 Dependencies
@@ -106,7 +106,7 @@ zigeth/
 
 ### Prerequisites
 
-- **Zig 0.14.1** or later ([Download](https://ziglang.org/download/))
+- **Zig 0.15.0** or later ([Download](https://ziglang.org/download/))
 - **libc** (standard C library - usually pre-installed)
 
 ### Installation

@@ -9,7 +9,7 @@
     .fingerprint = 0x6f8e09d114966ae6,
 
     // Minimum Zig version required
-    .minimum_zig_version = "0.14.1",
+    .minimum_zig_version = "0.15.0",
 
     // Dependencies
     // To add a new dependency, use: zig fetch --save <url>
