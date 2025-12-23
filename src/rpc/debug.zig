@@ -404,7 +404,7 @@ fn parseTraceResult(allocator: std.mem.Allocator, json: std.json.Value) !TraceRe
     }
 
     // Parse struct logs
-    var struct_logs = std.ArrayList(StructLog).init(allocator);
+    var struct_logs = std.array_list.Managed(StructLog).init(allocator);
     defer struct_logs.deinit();
 
     if (obj.get("structLogs")) |logs_val| {
@@ -432,7 +432,7 @@ fn parseTraceResults(allocator: std.mem.Allocator, json: std.json.Value) ![]Trac
         return error.InvalidResponse;
     }
 
-    var results = std.ArrayList(TraceResult).init(allocator);
+    var results = std.array_list.Managed(TraceResult).init(allocator);
     defer results.deinit();
 
     for (json.array.items) |item| {
@@ -479,7 +479,7 @@ fn parseStructLog(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Struct
     var stack: ?[]U256 = null;
     if (obj.get("stack")) |stack_val| {
         if (stack_val == .array) {
-            var stack_items = std.ArrayList(U256).init(allocator);
+            var stack_items = std.array_list.Managed(U256).init(allocator);
             defer stack_items.deinit();
 
             for (stack_val.array.items) |item| {
@@ -497,7 +497,7 @@ fn parseStructLog(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Struct
     if (obj.get("memory")) |mem_val| {
         if (mem_val == .array) {
             // Memory is returned as array of hex strings
-            var mem_data = std.ArrayList(u8).init(allocator);
+            var mem_data = std.array_list.Managed(u8).init(allocator);
             defer mem_data.deinit();
 
             for (mem_val.array.items) |item| {
@@ -568,7 +568,7 @@ fn parseStorageRange(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Sto
 
 /// Parse address array from JSON
 fn parseAddressArray(allocator: std.mem.Allocator, array: std.json.Array) ![]Address {
-    var addresses = std.ArrayList(Address).init(allocator);
+    var addresses = std.array_list.Managed(Address).init(allocator);
     defer addresses.deinit();
 
     for (array.items) |item| {

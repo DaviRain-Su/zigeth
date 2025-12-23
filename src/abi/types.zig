@@ -187,19 +187,19 @@ pub const Function = struct {
 
     /// Get function signature string
     pub fn getSignature(self: Function, allocator: std.mem.Allocator) ![]u8 {
-        var sig = std.ArrayList(u8).init(allocator);
-        defer sig.deinit();
+        var sig = try std.ArrayList(u8).initCapacity(allocator, 0);
+        defer sig.deinit(allocator);
 
-        try sig.appendSlice(self.name);
-        try sig.append('(');
+        try sig.appendSlice(allocator, self.name);
+        try sig.append(allocator, '(');
 
         for (self.inputs, 0..) |param, i| {
-            if (i > 0) try sig.append(',');
-            try sig.appendSlice(try param.type.toString(allocator));
+            if (i > 0) try sig.append(allocator, ',');
+            try sig.appendSlice(allocator, try param.type.toString(allocator));
         }
 
-        try sig.append(')');
-        return sig.toOwnedSlice();
+        try sig.append(allocator, ')');
+        return try sig.toOwnedSlice(allocator);
     }
 };
 
@@ -211,19 +211,19 @@ pub const Event = struct {
 
     /// Get event signature hash
     pub fn getSignature(self: Event, allocator: std.mem.Allocator) ![]u8 {
-        var sig = std.ArrayList(u8).init(allocator);
-        defer sig.deinit();
+        var sig = try std.ArrayList(u8).initCapacity(allocator, self.name.len + 2);
+        defer sig.deinit(allocator);
 
-        try sig.appendSlice(self.name);
-        try sig.append('(');
+        try sig.appendSlice(allocator, self.name);
+        try sig.append(allocator, '(');
 
         for (self.inputs, 0..) |param, i| {
-            if (i > 0) try sig.append(',');
-            try sig.appendSlice(try param.type.toString(allocator));
+            if (i > 0) try sig.append(allocator, ',');
+            try sig.appendSlice(allocator, try param.type.toString(allocator));
         }
 
-        try sig.append(')');
-        return sig.toOwnedSlice();
+        try sig.append(allocator, ')');
+        return try sig.toOwnedSlice(allocator);
     }
 };
 

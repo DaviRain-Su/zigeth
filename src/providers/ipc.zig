@@ -88,15 +88,15 @@ pub const IpcProvider = struct {
         _ = try stream.write(request);
 
         // Read response from socket
-        var response_buf = std.ArrayList(u8).init(self.allocator);
-        errdefer response_buf.deinit();
+        var response_buf = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        errdefer response_buf.deinit(self.allocator);
 
         var read_buf: [4096]u8 = undefined;
         while (true) {
             const bytes_read = try stream.read(&read_buf);
             if (bytes_read == 0) break;
 
-            try response_buf.appendSlice(read_buf[0..bytes_read]);
+            try response_buf.appendSlice(self.allocator, read_buf[0..bytes_read]);
 
             // Check if we have a complete JSON response
             // (basic check for matching braces)
@@ -111,7 +111,7 @@ pub const IpcProvider = struct {
             }
         }
 
-        return response_buf.toOwnedSlice();
+        return response_buf.toOwnedSlice(self.allocator);
     }
 
     /// Get stream for direct access

@@ -114,15 +114,15 @@ pub fn decodeFunctionReturn(
     output_types: []const types.Parameter,
 ) ![]types.AbiValue {
     var decoder = Decoder.init(allocator, data);
-    var results = std.ArrayList(types.AbiValue).init(allocator);
-    defer results.deinit();
+    var results = try std.ArrayList(types.AbiValue).initCapacity(allocator, 0);
+    defer results.deinit(allocator);
 
     for (output_types) |param| {
         const value = try decodeValue(&decoder, param.type);
-        try results.append(value);
+        try results.append(allocator, value);
     }
 
-    return try results.toOwnedSlice();
+    return try results.toOwnedSlice(allocator);
 }
 
 /// Decode a single value

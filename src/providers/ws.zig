@@ -154,25 +154,25 @@ pub const WsProvider = struct {
         const request_id = self.getNextRequestId();
 
         // Build filter JSON
-        var filter_json = std.ArrayList(u8).init(self.allocator);
-        defer filter_json.deinit();
+        var filter_json = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer filter_json.deinit(self.allocator);
 
-        try filter_json.appendSlice("{");
+        try filter_json.appendSlice(self.allocator, "{");
         if (filter.address) |addr| {
-            try filter_json.appendSlice("\"address\":\"");
+            try filter_json.appendSlice(self.allocator, "\"address\":\"");
             const addr_hex = try addr.toHex(self.allocator);
             defer self.allocator.free(addr_hex);
-            try filter_json.appendSlice(addr_hex);
-            try filter_json.appendSlice("\",");
+            try filter_json.appendSlice(self.allocator, addr_hex);
+            try filter_json.appendSlice(self.allocator, "\",");
         }
         if (filter.topics) |_| {
-            try filter_json.appendSlice("\"topics\":[],");
+            try filter_json.appendSlice(self.allocator, "\"topics\":[],");
         }
         // Remove trailing comma if present
         if (filter_json.items.len > 1 and filter_json.items[filter_json.items.len - 1] == ',') {
             _ = filter_json.pop();
         }
-        try filter_json.appendSlice("}");
+        try filter_json.appendSlice(self.allocator, "}");
 
         const request = try std.fmt.allocPrint(
             self.allocator,
@@ -418,7 +418,7 @@ const WsClient = struct {
         const stream = self.stream orelse return error.NotConnected;
 
         // Build WebSocket frame (text frame, no masking for simplicity)
-        var frame = std.ArrayList(u8).init(self.allocator);
+        var frame = std.array_list.Managed(u8).init(self.allocator);
         defer frame.deinit();
 
         // Opcode: text frame (0x81)
@@ -453,7 +453,7 @@ const WsClient = struct {
     pub fn receiveMessage(self: *WsClient) ![]u8 {
         const stream = self.stream orelse return error.NotConnected;
 
-        var response = std.ArrayList(u8).init(self.allocator);
+        var response = std.array_list.Managed(u8).init(self.allocator);
         errdefer response.deinit();
 
         // Read frame header

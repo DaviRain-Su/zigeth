@@ -119,8 +119,8 @@ pub fn parseEvent(
     }
 
     // Extract indexed arguments from topics
-    var indexed_args = std.ArrayList(abi.AbiValue).init(allocator);
-    defer indexed_args.deinit();
+    var indexed_args = try std.ArrayList(abi.AbiValue).initCapacity(allocator, 0);
+    defer indexed_args.deinit(allocator);
 
     var topic_idx: usize = if (event.anonymous) 0 else 1; // Skip event signature if not anonymous
 
@@ -153,14 +153,14 @@ pub fn parseEvent(
                 else => return error.UnsupportedIndexedType,
             };
 
-            try indexed_args.append(value);
+            try indexed_args.append(allocator, value);
             topic_idx += 1;
         }
     }
 
     // Decode non-indexed arguments from data
-    var data_args = std.ArrayList(abi.AbiValue).init(allocator);
-    defer data_args.deinit();
+    var data_args = try std.ArrayList(abi.AbiValue).initCapacity(allocator, 0);
+    defer data_args.deinit(allocator);
 
     if (log.data.len() > 0) {
         var decoder = decode.Decoder.init(allocator, log.data.data);
@@ -191,15 +191,15 @@ pub fn parseEvent(
                     else => return error.UnsupportedDataType,
                 };
 
-                try data_args.append(value);
+                try data_args.append(allocator, value);
             }
         }
     }
 
     return ParsedEvent{
         .event = event,
-        .indexed_args = try indexed_args.toOwnedSlice(),
-        .data_args = try data_args.toOwnedSlice(),
+        .indexed_args = try indexed_args.toOwnedSlice(allocator),
+        .data_args = try data_args.toOwnedSlice(allocator),
         .log = log,
         .allocator = allocator,
     };
@@ -211,15 +211,15 @@ pub fn parseEvents(
     event: abi.Event,
     logs: []const Log,
 ) ![]ParsedEvent {
-    var results = std.ArrayList(ParsedEvent).init(allocator);
-    defer results.deinit();
+    var results = try std.ArrayList(ParsedEvent).initCapacity(allocator, 0);
+    defer results.deinit(allocator);
 
     for (logs) |log| {
         const parsed = parseEvent(allocator, event, log) catch continue;
-        try results.append(parsed);
+        try results.append(allocator, parsed);
     }
 
-    return try results.toOwnedSlice();
+    return try results.toOwnedSlice(allocator);
 }
 
 /// Get event signature hash from event definition

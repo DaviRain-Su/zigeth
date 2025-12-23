@@ -320,19 +320,19 @@ pub const Mnemonic = struct {
     /// Create mnemonic from phrase
     pub fn fromPhrase(allocator: std.mem.Allocator, phrase: []const u8) !Mnemonic {
         // Split by spaces
-        var words = std.ArrayList([]const u8).init(allocator);
-        defer words.deinit();
+        var words = try std.ArrayList([]const u8).initCapacity(allocator, 0);
+        defer words.deinit(allocator);
 
         var iter = std.mem.splitScalar(u8, phrase, ' ');
         while (iter.next()) |word| {
             if (word.len > 0) {
                 const word_copy = try allocator.dupe(u8, word);
-                try words.append(word_copy);
+                try words.append(allocator, word_copy);
             }
         }
 
         return .{
-            .words = try words.toOwnedSlice(),
+            .words = try words.toOwnedSlice(allocator),
             .allocator = allocator,
         };
     }
@@ -344,10 +344,10 @@ pub const Mnemonic = struct {
         const phrase = try self.toPhrase();
         defer self.allocator.free(phrase);
 
-        var salt = std.ArrayList(u8).init(self.allocator);
-        defer salt.deinit();
-        try salt.appendSlice("mnemonic");
-        try salt.appendSlice(passphrase);
+        var salt = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer salt.deinit(self.allocator);
+        try salt.appendSlice(self.allocator, "mnemonic");
+        try salt.appendSlice(self.allocator, passphrase);
 
         // Derive 64-byte seed using PBKDF2-HMAC-SHA512
         var seed: [64]u8 = undefined;
@@ -364,15 +364,15 @@ pub const Mnemonic = struct {
 
     /// Get phrase as string
     pub fn toPhrase(self: Mnemonic) ![]u8 {
-        var phrase = std.ArrayList(u8).init(self.allocator);
-        defer phrase.deinit();
+        var phrase = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer phrase.deinit(self.allocator);
 
         for (self.words, 0..) |word, i| {
-            if (i > 0) try phrase.append(' ');
-            try phrase.appendSlice(word);
+            if (i > 0) try phrase.append(self.allocator, ' ');
+            try phrase.appendSlice(self.allocator, word);
         }
 
-        return phrase.toOwnedSlice();
+        return phrase.toOwnedSlice(self.allocator);
     }
 
     /// Free memory

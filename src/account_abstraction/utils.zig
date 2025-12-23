@@ -34,15 +34,15 @@ pub const UserOpHash = struct {
         const user_op_hash = keccak.hash(packed_data);
 
         // Step 3: Create final hash: keccak256(userOpHash ++ entryPoint ++ chainId)
-        var final_data = std.ArrayList(u8).init(allocator);
-        defer final_data.deinit();
+        var final_data = try std.ArrayList(u8).initCapacity(allocator, 0);
+        defer final_data.deinit(allocator);
 
-        try final_data.appendSlice(&user_op_hash.bytes);
-        try final_data.appendSlice(&entry_point.bytes);
+        try final_data.appendSlice(allocator, &user_op_hash.bytes);
+        try final_data.appendSlice(allocator, &entry_point.bytes);
 
         var chain_id_bytes: [32]u8 = [_]u8{0} ** 32;
         std.mem.writeInt(u64, chain_id_bytes[24..32][0..8], chain_id, .big);
-        try final_data.appendSlice(&chain_id_bytes);
+        try final_data.appendSlice(allocator, &chain_id_bytes);
 
         return keccak.hash(final_data.items);
     }
@@ -51,29 +51,29 @@ pub const UserOpHash = struct {
     fn packUserOperation(allocator: std.mem.Allocator, user_op: anytype) ![]u8 {
         const UserOpType = @TypeOf(user_op);
 
-        var packed_bytes = std.ArrayList(u8).init(allocator);
-        errdefer packed_bytes.deinit();
+        var packed_bytes = try std.ArrayList(u8).initCapacity(allocator, 0);
+        errdefer packed_bytes.deinit(allocator);
 
         // Common fields across all versions
-        try packed_bytes.appendSlice(&user_op.sender.bytes);
+        try packed_bytes.appendSlice(allocator, &user_op.sender.bytes);
 
         var nonce_bytes: [32]u8 = undefined;
         std.mem.writeInt(u256, &nonce_bytes, user_op.nonce, .big);
-        try packed_bytes.appendSlice(&nonce_bytes);
+        try packed_bytes.appendSlice(allocator, &nonce_bytes);
 
         // Hash initCode or factory data
         if (UserOpType == types.UserOperationV06) {
             const init_hash = keccak.hash(user_op.initCode);
-            try packed_bytes.appendSlice(&init_hash.bytes);
+            try packed_bytes.appendSlice(allocator, &init_hash.bytes);
         } else {
             // v0.7/v0.8: hash factoryData
             const factory_hash = keccak.hash(user_op.factoryData);
-            try packed_bytes.appendSlice(&factory_hash.bytes);
+            try packed_bytes.appendSlice(allocator, &factory_hash.bytes);
         }
 
         // Hash callData
         const call_hash = keccak.hash(user_op.callData);
-        try packed_bytes.appendSlice(&call_hash.bytes);
+        try packed_bytes.appendSlice(allocator, &call_hash.bytes);
 
         // Gas limits (version-specific encoding)
         if (UserOpType == types.UserOperationV06) {
@@ -81,49 +81,49 @@ pub const UserOpHash = struct {
             var gas_bytes: [32]u8 = undefined;
 
             std.mem.writeInt(u256, &gas_bytes, user_op.callGasLimit, .big);
-            try packed_bytes.appendSlice(&gas_bytes);
+            try packed_bytes.appendSlice(allocator, &gas_bytes);
 
             std.mem.writeInt(u256, &gas_bytes, user_op.verificationGasLimit, .big);
-            try packed_bytes.appendSlice(&gas_bytes);
+            try packed_bytes.appendSlice(allocator, &gas_bytes);
 
             std.mem.writeInt(u256, &gas_bytes, user_op.preVerificationGas, .big);
-            try packed_bytes.appendSlice(&gas_bytes);
+            try packed_bytes.appendSlice(allocator, &gas_bytes);
 
             std.mem.writeInt(u256, &gas_bytes, user_op.maxFeePerGas, .big);
-            try packed_bytes.appendSlice(&gas_bytes);
+            try packed_bytes.appendSlice(allocator, &gas_bytes);
 
             std.mem.writeInt(u256, &gas_bytes, user_op.maxPriorityFeePerGas, .big);
-            try packed_bytes.appendSlice(&gas_bytes);
+            try packed_bytes.appendSlice(allocator, &gas_bytes);
 
             // Hash paymasterAndData
             const paymaster_hash = keccak.hash(user_op.paymasterAndData);
-            try packed_bytes.appendSlice(&paymaster_hash.bytes);
+            try packed_bytes.appendSlice(allocator, &paymaster_hash.bytes);
         } else {
             // v0.7/v0.8: u128 for most gas fields
             var gas_bytes_128: [16]u8 = undefined;
             var gas_bytes_256: [32]u8 = undefined;
 
             std.mem.writeInt(u128, &gas_bytes_128, user_op.callGasLimit, .big);
-            try packed_bytes.appendSlice(&gas_bytes_128);
+            try packed_bytes.appendSlice(allocator, &gas_bytes_128);
 
             std.mem.writeInt(u128, &gas_bytes_128, user_op.verificationGasLimit, .big);
-            try packed_bytes.appendSlice(&gas_bytes_128);
+            try packed_bytes.appendSlice(allocator, &gas_bytes_128);
 
             std.mem.writeInt(u256, &gas_bytes_256, user_op.preVerificationGas, .big);
-            try packed_bytes.appendSlice(&gas_bytes_256);
+            try packed_bytes.appendSlice(allocator, &gas_bytes_256);
 
             std.mem.writeInt(u128, &gas_bytes_128, user_op.maxFeePerGas, .big);
-            try packed_bytes.appendSlice(&gas_bytes_128);
+            try packed_bytes.appendSlice(allocator, &gas_bytes_128);
 
             std.mem.writeInt(u128, &gas_bytes_128, user_op.maxPriorityFeePerGas, .big);
-            try packed_bytes.appendSlice(&gas_bytes_128);
+            try packed_bytes.appendSlice(allocator, &gas_bytes_128);
 
             // Hash paymasterData
             const paymaster_hash = keccak.hash(user_op.paymasterData);
-            try packed_bytes.appendSlice(&paymaster_hash.bytes);
+            try packed_bytes.appendSlice(allocator, &paymaster_hash.bytes);
         }
 
-        return try packed_bytes.toOwnedSlice();
+        return try packed_bytes.toOwnedSlice(allocator);
     }
 };
 

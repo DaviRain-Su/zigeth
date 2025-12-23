@@ -70,17 +70,17 @@ pub const PaymasterClient = struct {
         try context_obj.put("mode", .{ .string = mode.toString() });
 
         // Build params array: [userOp, entryPoint, context]
-        var params_array = std.ArrayList(std.json.Value).init(self.allocator);
-        defer params_array.deinit();
+        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
+        defer params_array.deinit(self.allocator);
 
         const user_op_value = try std.json.Value.jsonStringify(user_op_json, .{}, self.allocator);
         defer if (user_op_value == .object) user_op_value.object.deinit();
 
-        try params_array.append(user_op_value);
-        try params_array.append(.{ .string = entry_point_hex });
-        try params_array.append(.{ .object = context_obj });
+        try params_array.append(self.allocator, user_op_value);
+        try params_array.append(self.allocator, .{ .string = entry_point_hex });
+        try params_array.append(self.allocator, .{ .object = context_obj });
 
-        const params = std.json.Value{ .array = try params_array.toOwnedSlice() };
+        const params = std.json.Value{ .array = try params_array.toOwnedSlice(self.allocator) };
         defer params.array.deinit(self.allocator);
 
         // Make RPC call
@@ -167,27 +167,27 @@ pub const PaymasterClient = struct {
         defer self.allocator.free(entry_point_hex);
 
         // Convert token addresses to hex array
-        var token_array = std.ArrayList(std.json.Value).init(self.allocator);
-        defer token_array.deinit();
+        var token_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
+        defer token_array.deinit(self.allocator);
 
         for (tokens) |token| {
             const token_hex = try token.toHex(self.allocator);
             defer self.allocator.free(token_hex);
-            try token_array.append(.{ .string = try self.allocator.dupe(u8, token_hex) });
+            try token_array.append(self.allocator, .{ .string = try self.allocator.dupe(u8, token_hex) });
         }
 
         // Build params array: [userOp, entryPoint, tokens]
-        var params_array = std.ArrayList(std.json.Value).init(self.allocator);
-        defer params_array.deinit();
+        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
+        defer params_array.deinit(self.allocator);
 
         const user_op_value = try std.json.Value.jsonStringify(user_op_json, .{}, self.allocator);
         defer if (user_op_value == .object) user_op_value.object.deinit();
 
-        try params_array.append(user_op_value);
-        try params_array.append(.{ .string = entry_point_hex });
-        try params_array.append(.{ .array = try token_array.toOwnedSlice() });
+        try params_array.append(self.allocator, user_op_value);
+        try params_array.append(self.allocator, .{ .string = entry_point_hex });
+        try params_array.append(self.allocator, .{ .array = try token_array.toOwnedSlice(self.allocator) });
 
-        const params = std.json.Value{ .array = try params_array.toOwnedSlice() };
+        const params = std.json.Value{ .array = try params_array.toOwnedSlice(self.allocator) };
         defer params.array.deinit(self.allocator);
 
         // Make RPC call
@@ -196,8 +196,8 @@ pub const PaymasterClient = struct {
 
         // Parse response array
         const quotes_array = response.array;
-        var result = std.ArrayList(TokenQuote).init(self.allocator);
-        errdefer result.deinit();
+        var result = try std.ArrayList(TokenQuote).initCapacity(self.allocator, 0);
+        errdefer result.deinit(self.allocator);
 
         for (quotes_array) |quote_value| {
             const quote_obj = quote_value.object;
@@ -208,7 +208,7 @@ pub const PaymasterClient = struct {
             const exchange_rate = try parseHexU256(quote_obj.get("etherTokenExchangeRate").?.string);
             const service_fee = @as(u8, @intCast(quote_obj.get("serviceFeePercent").?.integer));
 
-            try result.append(TokenQuote{
+            try result.append(self.allocator, TokenQuote{
                 .token = token_addr,
                 .symbol = symbol,
                 .decimals = decimals,
@@ -217,7 +217,7 @@ pub const PaymasterClient = struct {
             });
         }
 
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(self.allocator);
     }
 
     /// Verify paymaster signature

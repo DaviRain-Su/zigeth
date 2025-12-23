@@ -332,7 +332,7 @@ pub const EthNamespace = struct {
             return error.InvalidResponse;
         }
 
-        var logs = std.ArrayList(Log).init(self.client.allocator);
+        var logs = std.array_list.Managed(Log).init(self.client.allocator);
         errdefer {
             for (logs.items) |log| {
                 log.deinit();
@@ -498,7 +498,7 @@ pub const EthNamespace = struct {
             return error.InvalidResponse;
         }
 
-        var addresses = std.ArrayList(Address).init(self.client.allocator);
+        var addresses = std.array_list.Managed(Address).init(self.client.allocator);
         errdefer addresses.deinit();
 
         for (result.array.items) |item| {
@@ -739,7 +739,7 @@ fn parseLogFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Log 
     const topics_json = obj.get("topics") orelse return error.MissingField;
     if (topics_json != .array) return error.InvalidFieldType;
 
-    var topics = std.ArrayList(Hash).init(allocator);
+    var topics = std.array_list.Managed(Hash).init(allocator);
     defer topics.deinit();
 
     for (topics_json.array.items) |topic_val| {
@@ -986,7 +986,7 @@ fn parseReceiptFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !
     const logs_json = obj.get("logs") orelse return error.MissingField;
     if (logs_json != .array) return error.InvalidFieldType;
 
-    var logs = std.ArrayList(Log).init(allocator);
+    var logs = std.array_list.Managed(Log).init(allocator);
     defer logs.deinit();
 
     for (logs_json.array.items) |log_json| {
@@ -1186,7 +1186,7 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
     const transactions_json = obj.get("transactions") orelse return error.MissingField;
     if (transactions_json != .array) return error.InvalidFieldType;
 
-    var transactions = std.ArrayList(Transaction).init(allocator);
+    var transactions = std.array_list.Managed(Transaction).init(allocator);
     defer transactions.deinit();
 
     if (full_tx) {

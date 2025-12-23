@@ -510,11 +510,12 @@ fn decryptAES128CTR(allocator: std.mem.Allocator, ciphertext: []const u8, key: [
 /// Calculate MAC for verification
 fn calculateMAC(key: []const u8, ciphertext: []const u8) ![32]u8 {
     // MAC = keccak256(derived_key[16:32] + ciphertext)
-    var data = std.ArrayList(u8).init(std.heap.page_allocator);
-    defer data.deinit();
+    const allocator = std.heap.page_allocator;
+    var data = try std.ArrayList(u8).initCapacity(allocator, 0);
+    defer data.deinit(allocator);
 
-    try data.appendSlice(key);
-    try data.appendSlice(ciphertext);
+    try data.appendSlice(allocator, key);
+    try data.appendSlice(allocator, ciphertext);
 
     return keccak.hash(data.items).bytes;
 }

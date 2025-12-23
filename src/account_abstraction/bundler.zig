@@ -74,14 +74,14 @@ pub const BundlerClient = struct {
         defer self.allocator.free(entry_point_hex);
 
         // Build params array: [userOp, entryPoint]
-        var params_array = std.ArrayList(std.json.Value).init(self.allocator);
-        defer params_array.deinit();
+        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
+        defer params_array.deinit(self.allocator);
 
         const user_op_value = try std.json.Value.jsonStringify(user_op_json, .{}, self.allocator);
         const entry_point_value = std.json.Value{ .string = entry_point_hex };
 
-        try params_array.append(user_op_value);
-        try params_array.append(entry_point_value);
+        try params_array.append(self.allocator, user_op_value);
+        try params_array.append(self.allocator, entry_point_value);
 
         const params = std.json.Value{ .array = params_array.items };
 
@@ -112,9 +112,9 @@ pub const BundlerClient = struct {
         defer user_op_json.deinit(self.allocator);
 
         // Serialize UserOperation to JSON string
-        var json_string = std.ArrayList(u8).init(self.allocator);
-        defer json_string.deinit();
-        try std.json.stringify(user_op_json, .{}, json_string.writer());
+        var json_string = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer json_string.deinit(self.allocator);
+        try std.json.stringify(user_op_json, .{}, json_string.writer(self.allocator));
 
         // Parse JSON string into Value
         const parsed = try std.json.parseFromSlice(std.json.Value, self.allocator, json_string.items, .{});
@@ -127,12 +127,12 @@ pub const BundlerClient = struct {
         const entry_point_value = std.json.Value{ .string = entry_point_hex };
 
         // Build params array: [userOp, entryPoint]
-        var params_array = std.ArrayList(std.json.Value).init(self.allocator);
-        defer params_array.deinit();
-        try params_array.append(user_op_value);
-        try params_array.append(entry_point_value);
+        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
+        defer params_array.deinit(self.allocator);
+        try params_array.append(self.allocator, user_op_value);
+        try params_array.append(self.allocator, entry_point_value);
 
-        const params = std.json.Value{ .array = params_array };
+        const params = std.json.Value{ .array = params_array.items };
 
         // Make RPC call
         const response = try self.rpc_client.call("eth_estimateUserOperationGas", params);
@@ -166,11 +166,11 @@ pub const BundlerClient = struct {
         defer self.allocator.free(hash_hex);
 
         // Build params array: [userOpHash]
-        var params_array = std.ArrayList(std.json.Value).init(self.allocator);
-        defer params_array.deinit();
+        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
+        defer params_array.deinit(self.allocator);
 
         const hash_value = std.json.Value{ .string = hash_hex };
-        try params_array.append(hash_value);
+        try params_array.append(self.allocator, hash_value);
 
         const params = std.json.Value{ .array = params_array.items };
 
@@ -197,11 +197,11 @@ pub const BundlerClient = struct {
         defer self.allocator.free(hash_hex);
 
         // Build params array: [userOpHash]
-        var params_array = std.ArrayList(std.json.Value).init(self.allocator);
-        defer params_array.deinit();
+        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
+        defer params_array.deinit(self.allocator);
 
         const hash_value = std.json.Value{ .string = hash_hex };
-        try params_array.append(hash_value);
+        try params_array.append(self.allocator, hash_value);
 
         const params = std.json.Value{ .array = params_array.items };
 
@@ -232,16 +232,16 @@ pub const BundlerClient = struct {
         // Parse result as array of address strings
         const addresses_array = response.array;
 
-        var result = std.ArrayList(primitives.Address).init(self.allocator);
-        errdefer result.deinit();
+        var result = try std.ArrayList(primitives.Address).initCapacity(self.allocator, 0);
+        errdefer result.deinit(self.allocator);
 
         for (addresses_array) |addr_value| {
             const addr_str = addr_value.string;
             const address = try primitives.Address.fromHex(addr_str);
-            try result.append(address);
+            try result.append(self.allocator, address);
         }
 
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(self.allocator);
     }
 
     /// Get chain ID

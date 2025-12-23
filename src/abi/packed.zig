@@ -12,7 +12,7 @@ pub const PackedEncoder = struct {
     pub fn init(allocator: std.mem.Allocator) PackedEncoder {
         return .{
             .allocator = allocator,
-            .buffer = std.ArrayList(u8).init(allocator),
+            .buffer = std.ArrayList(u8).initCapacity(allocator, 0),
         };
     }
 

@@ -124,24 +124,24 @@ pub const Decoder = struct {
 
     /// Decode list payload
     fn decodeListPayload(self: *Decoder, end: usize) !RlpValue {
-        var items = std.ArrayList(RlpValue).init(self.allocator);
+        var items = try std.ArrayList(RlpValue).initCapacity(self.allocator, 0);
         errdefer {
             for (items.items) |item| {
                 item.deinit(self.allocator);
             }
-            items.deinit();
+            items.deinit(self.allocator);
         }
 
         while (self.pos < end) {
             const item = try self.decode();
-            try items.append(item);
+            try items.append(self.allocator, item);
         }
 
         if (self.pos != end) {
             return error.InvalidListLength;
         }
 
-        return RlpValue{ .list = try items.toOwnedSlice() };
+        return RlpValue{ .list = try items.toOwnedSlice(self.allocator) };
     }
 
     /// Check if there's more data

@@ -20,38 +20,38 @@ pub const TransactionEncoder = struct {
             return error.NotLegacyTransaction;
         }
 
-        var items = std.ArrayList(encode.RlpItem).init(allocator);
-        defer items.deinit();
+        var items = try std.ArrayList(encode.RlpItem).initCapacity(allocator, 0);
+        defer items.deinit(allocator);
 
         // nonce
-        try items.append(.{ .uint = tx.nonce });
+        try items.append(allocator, .{ .uint = tx.nonce });
 
         // gas_price
         const gas_price_bytes = uint_utils.u256ToBytes(tx.gas_price.?);
-        try items.append(.{ .bytes = &gas_price_bytes });
+        try items.append(allocator, .{ .bytes = &gas_price_bytes });
 
         // gas_limit
-        try items.append(.{ .uint = tx.gas_limit });
+        try items.append(allocator, .{ .uint = tx.gas_limit });
 
         // to (or empty for contract creation)
         if (tx.to) |to_addr| {
-            try items.append(.{ .bytes = &to_addr.bytes });
+            try items.append(allocator, .{ .bytes = &to_addr.bytes });
         } else {
-            try items.append(.{ .bytes = &[_]u8{} });
+            try items.append(allocator, .{ .bytes = &[_]u8{} });
         }
 
         // value
         const value_bytes = uint_utils.u256ToBytes(tx.value);
-        try items.append(.{ .bytes = &value_bytes });
+        try items.append(allocator, .{ .bytes = &value_bytes });
 
         // data
-        try items.append(.{ .bytes = tx.data.data });
+        try items.append(allocator, .{ .bytes = tx.data.data });
 
         // For EIP-155: v, r, s (chain_id, 0, 0)
         if (tx.chain_id) |chain_id| {
-            try items.append(.{ .uint = chain_id });
-            try items.append(.{ .uint = 0 });
-            try items.append(.{ .uint = 0 });
+            try items.append(allocator, .{ .uint = chain_id });
+            try items.append(allocator, .{ .uint = 0 });
+            try items.append(allocator, .{ .uint = 0 });
         }
 
         return try encode.encodeList(allocator, items.items);
@@ -70,40 +70,40 @@ pub const TransactionEncoder = struct {
             return error.TransactionNotSigned;
         }
 
-        var items = std.ArrayList(encode.RlpItem).init(allocator);
-        defer items.deinit();
+        var items = try std.ArrayList(encode.RlpItem).initCapacity(allocator, 0);
+        defer items.deinit(allocator);
 
         // nonce
-        try items.append(.{ .uint = tx.nonce });
+        try items.append(allocator, .{ .uint = tx.nonce });
 
         // gas_price
         const gas_price_bytes = uint_utils.u256ToBytes(tx.gas_price.?);
-        try items.append(.{ .bytes = &gas_price_bytes });
+        try items.append(allocator, .{ .bytes = &gas_price_bytes });
 
         // gas_limit
-        try items.append(.{ .uint = tx.gas_limit });
+        try items.append(allocator, .{ .uint = tx.gas_limit });
 
         // to
         if (tx.to) |to_addr| {
-            try items.append(.{ .bytes = &to_addr.bytes });
+            try items.append(allocator, .{ .bytes = &to_addr.bytes });
         } else {
-            try items.append(.{ .bytes = &[_]u8{} });
+            try items.append(allocator, .{ .bytes = &[_]u8{} });
         }
 
         // value
         const value_bytes = uint_utils.u256ToBytes(tx.value);
-        try items.append(.{ .bytes = &value_bytes });
+        try items.append(allocator, .{ .bytes = &value_bytes });
 
         // data
-        try items.append(.{ .bytes = tx.data.data });
+        try items.append(allocator, .{ .bytes = tx.data.data });
 
         // Signature (v, r, s)
         const sig = tx.signature.?;
-        try items.append(.{ .uint = sig.v });
+        try items.append(allocator, .{ .uint = sig.v });
 
         // r and s are already [32]u8 arrays
-        try items.append(.{ .bytes = &sig.r });
-        try items.append(.{ .bytes = &sig.s });
+        try items.append(allocator, .{ .bytes = &sig.r });
+        try items.append(allocator, .{ .bytes = &sig.s });
 
         return try encode.encodeList(allocator, items.items);
     }
@@ -142,11 +142,11 @@ pub const EthereumEncoder = struct {
         allocator: std.mem.Allocator,
         addresses: []const Address,
     ) ![]u8 {
-        var items = std.ArrayList(encode.RlpItem).init(allocator);
-        defer items.deinit();
+        var items = try std.ArrayList(encode.RlpItem).initCapacity(allocator, 0);
+        defer items.deinit(allocator);
 
         for (addresses) |addr| {
-            try items.append(.{ .bytes = &addr.bytes });
+            try items.append(allocator, .{ .bytes = &addr.bytes });
         }
 
         return try encode.encodeList(allocator, items.items);
@@ -157,11 +157,11 @@ pub const EthereumEncoder = struct {
         allocator: std.mem.Allocator,
         hashes: []const Hash,
     ) ![]u8 {
-        var items = std.ArrayList(encode.RlpItem).init(allocator);
-        defer items.deinit();
+        var items = try std.ArrayList(encode.RlpItem).initCapacity(allocator, 0);
+        defer items.deinit(allocator);
 
         for (hashes) |hash| {
-            try items.append(.{ .bytes = &hash.bytes });
+            try items.append(allocator, .{ .bytes = &hash.bytes });
         }
 
         return try encode.encodeList(allocator, items.items);

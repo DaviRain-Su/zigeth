@@ -36,7 +36,7 @@ pub const NonceMiddleware = struct {
             .strategy = strategy,
             .allocator = allocator,
             .nonce_cache = std.AutoHashMap(Address, u64).init(allocator),
-            .pending_txs = std.AutoHashMap(Address, std.ArrayList(PendingTransaction)).init(allocator),
+            .pending_txs = std.AutoHashMap(Address, std.ArrayList(PendingTransaction)).initCapacity(allocator, 0),
             .last_sync = std.AutoHashMap(Address, i64).init(allocator),
             .sync_interval_seconds = 30, // Sync every 30 seconds for hybrid mode
         };
@@ -122,7 +122,7 @@ pub const NonceMiddleware = struct {
 
         // Check if list exists, create if not
         if (!self.pending_txs.contains(address)) {
-            const new_list = std.ArrayList(PendingTransaction).init(self.allocator);
+            const new_list = try std.ArrayList(PendingTransaction).initCapacity(self.allocator, 0);
             try self.pending_txs.put(address, new_list);
         }
 

@@ -39,7 +39,7 @@ pub const RpcClient = struct {
         const request = try types.JsonRpcRequest.init(self.allocator, method, params, id);
 
         // Serialize request to JSON
-        var request_str = std.ArrayList(u8).init(self.allocator);
+        var request_str = std.array_list.Managed(u8).init(self.allocator);
         defer request_str.deinit();
 
         try std.json.stringify(request, .{}, request_str.writer());
@@ -143,7 +143,7 @@ pub const HttpTransport = struct {
         defer client.deinit();
 
         // Build extra headers array
-        var extra_headers_list = std.ArrayList(std.http.Header).init(self.allocator);
+        var extra_headers_list = std.array_list.Managed(std.http.Header).init(self.allocator);
         defer extra_headers_list.deinit();
 
         var it = self.headers.iterator();
@@ -180,7 +180,7 @@ pub const HttpTransport = struct {
         }
 
         // Read response body
-        var response_body = std.ArrayList(u8).init(self.allocator);
+        var response_body = std.array_list.Managed(u8).init(self.allocator);
         defer response_body.deinit();
 
         const max_size = 10 * 1024 * 1024; // 10 MB max

@@ -181,7 +181,7 @@ pub fn formatError(
     err: anyerror,
     context: ?ErrorContext,
 ) ![]const u8 {
-    var result = std.ArrayList(u8).init(allocator);
+    var result = std.array_list.Managed(u8).init(allocator);
     errdefer result.deinit();
 
     const writer = result.writer();
@@ -338,7 +338,7 @@ pub const ErrorFormatter = struct {
         err: anyerror,
         context: ?ErrorContext,
     ) ![]const u8 {
-        var result = std.ArrayList(u8).init(self.allocator);
+        var result = std.array_list.Managed(u8).init(self.allocator);
         errdefer result.deinit();
 
         try result.appendSlice("{");
@@ -376,7 +376,7 @@ pub const ErrorFormatter = struct {
         err: anyerror,
         context: ?ErrorContext,
     ) ![]const u8 {
-        var result = std.ArrayList(u8).init(self.allocator);
+        var result = std.array_list.Managed(u8).init(self.allocator);
         errdefer result.deinit();
 
         const writer = result.writer();
@@ -415,7 +415,7 @@ pub const ErrorFormatter = struct {
         err: anyerror,
         context: ?ErrorContext,
     ) ![]const u8 {
-        var result = std.ArrayList(u8).init(self.allocator);
+        var result = std.array_list.Managed(u8).init(self.allocator);
         errdefer result.deinit();
 
         const writer = result.writer();
@@ -552,7 +552,8 @@ pub const ErrorReporter = struct {
         defer self.allocator.free(log_entry);
 
         if (self.log_file) |file| {
-            const writer = file.writer();
+            var w = file.writer(&.{});
+            const writer = &w.interface;
             try writer.print("[{}] {s}\n", .{ timestamp, log_entry });
         }
 

@@ -148,16 +148,16 @@ pub const Receipt = struct {
 
     /// Get logs from a specific address
     pub fn getLogsFrom(self: Receipt, allocator: std.mem.Allocator, address: Address) ![]Log {
-        var matching_logs = std.ArrayList(Log).init(allocator);
-        defer matching_logs.deinit();
+        var matching_logs = try std.ArrayList(Log).initCapacity(allocator, 0);
+        defer matching_logs.deinit(allocator);
 
         for (self.logs) |log| {
             if (std.mem.eql(u8, &log.address.bytes, &address.bytes)) {
-                try matching_logs.append(log);
+                try matching_logs.append(allocator, log);
             }
         }
 
-        return matching_logs.toOwnedSlice();
+        return matching_logs.toOwnedSlice(allocator);
     }
 };
 

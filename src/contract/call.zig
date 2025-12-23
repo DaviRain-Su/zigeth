@@ -16,12 +16,12 @@ pub const CallBuilder = struct {
     value: ?U256,
     gas_limit: ?u64,
 
-    pub fn init(allocator: std.mem.Allocator, contract: *const Contract, function: abi.Function) CallBuilder {
+    pub fn init(allocator: std.mem.Allocator, contract: *const Contract, function: abi.Function) !CallBuilder {
         return .{
             .allocator = allocator,
             .contract = contract,
             .function = function,
-            .args = std.ArrayList(abi.AbiValue).init(allocator),
+            .args = try std.ArrayList(abi.AbiValue).initCapacity(allocator, 0),
             .from = null,
             .value = null,
             .gas_limit = null,
@@ -29,12 +29,12 @@ pub const CallBuilder = struct {
     }
 
     pub fn deinit(self: *CallBuilder) void {
-        self.args.deinit();
+        self.args.deinit(self.allocator);
     }
 
     /// Add an argument
     pub fn addArg(self: *CallBuilder, arg: abi.AbiValue) !void {
-        try self.args.append(arg);
+        try self.args.append(self.allocator, arg);
     }
 
     /// Set sender address
@@ -190,7 +190,7 @@ test "call builder creation" {
     const contract = try Contract.init(allocator, addr, &[_]abi.Function{func}, &[_]abi.Event{});
     defer contract.deinit();
 
-    var builder = CallBuilder.init(allocator, &contract, func);
+    var builder = try CallBuilder.init(allocator, &contract, func);
     defer builder.deinit();
 
     try std.testing.expectEqual(addr, builder.getTo());
@@ -213,7 +213,7 @@ test "call builder add arguments" {
     const contract = try Contract.init(allocator, addr, &[_]abi.Function{}, &[_]abi.Event{});
     defer contract.deinit();
 
-    var builder = CallBuilder.init(allocator, &contract, func);
+    var builder = try CallBuilder.init(allocator, &contract, func);
     defer builder.deinit();
 
     const to_addr = Address.fromBytes([_]u8{0x34} ** 20);
@@ -237,7 +237,7 @@ test "call builder set parameters" {
     const contract = try Contract.init(allocator, addr, &[_]abi.Function{}, &[_]abi.Event{});
     defer contract.deinit();
 
-    var builder = CallBuilder.init(allocator, &contract, func);
+    var builder = try CallBuilder.init(allocator, &contract, func);
     defer builder.deinit();
 
     const from = Address.fromBytes([_]u8{0x34} ** 20);

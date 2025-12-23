@@ -29,11 +29,9 @@ pub fn build(b: *std.Build) void {
     const secp256k1_artifact = secp256k1_dep.artifact("secp256k1");
 
     // Build static library
-    const lib = b.addStaticLibrary(.{
+    const lib = b.addLibrary(.{
         .name = "zigeth",
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = zigeth_mod,
     });
 
     // Link libc (required for some std library functions)
@@ -45,9 +43,11 @@ pub fn build(b: *std.Build) void {
     // Build executable (CLI tool)
     const exe = b.addExecutable(.{
         .name = "zigeth",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     exe.root_module.addImport("zigeth", zigeth_mod);
@@ -68,11 +68,14 @@ pub fn build(b: *std.Build) void {
 
     // Unit tests for library
     const lib_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/root.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
+    lib_unit_tests.root_module.addImport("secp256k1", secp256k1_mod);
     lib_unit_tests.linkLibC();
     lib_unit_tests.linkLibrary(secp256k1_artifact);
 
@@ -80,9 +83,11 @@ pub fn build(b: *std.Build) void {
 
     // Unit tests for executable
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     exe_unit_tests.root_module.addImport("zigeth", zigeth_mod);
@@ -146,9 +151,11 @@ pub fn build(b: *std.Build) void {
 
             const example_exe = b.addExecutable(.{
                 .name = example_name,
-                .root_source_file = b.path(example_path),
-                .target = target,
-                .optimize = optimize,
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path(example_path),
+                    .target = target,
+                    .optimize = optimize,
+                }),
             });
 
             example_exe.root_module.addImport("zigeth", zigeth_mod);
@@ -198,12 +205,15 @@ pub fn build(b: *std.Build) void {
     lint_step.dependOn(&fmt_check.step);
 
     // 2. Build library with warnings
-    const lint_lib = b.addStaticLibrary(.{
+    const lint_lib = b.addLibrary(.{
         .name = "zigeth-lint",
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = .Debug,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/root.zig"),
+            .target = target,
+            .optimize = .Debug,
+        }),
     });
+    lint_lib.root_module.addImport("secp256k1", secp256k1_mod);
     lint_lib.linkLibC();
 
     const lint_lib_check = b.addInstallArtifact(lint_lib, .{
@@ -214,9 +224,11 @@ pub fn build(b: *std.Build) void {
     // 3. Build executable with warnings
     const lint_exe = b.addExecutable(.{
         .name = "zigeth-lint",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = .Debug,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = .Debug,
+        }),
     });
     lint_exe.root_module.addImport("zigeth", zigeth_mod);
     lint_exe.linkLibC();

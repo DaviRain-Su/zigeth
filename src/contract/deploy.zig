@@ -22,11 +22,11 @@ pub const DeployBuilder = struct {
         allocator: std.mem.Allocator,
         bytecode: Bytes,
         constructor_types: []const abi.Parameter,
-    ) DeployBuilder {
+    ) !DeployBuilder {
         return .{
             .allocator = allocator,
             .bytecode = bytecode,
-            .constructor_args = std.ArrayList(abi.AbiValue).init(allocator),
+            .constructor_args = try std.ArrayList(abi.AbiValue).initCapacity(allocator, 0),
             .constructor_types = constructor_types,
             .from = null,
             .value = null,
@@ -35,12 +35,12 @@ pub const DeployBuilder = struct {
     }
 
     pub fn deinit(self: *DeployBuilder) void {
-        self.constructor_args.deinit();
+        self.constructor_args.deinit(self.allocator);
     }
 
     /// Add a constructor argument
     pub fn addArg(self: *DeployBuilder, arg: abi.AbiValue) !void {
-        try self.constructor_args.append(arg);
+        try self.constructor_args.append(self.allocator, arg);
     }
 
     /// Set deployer address
@@ -60,11 +60,11 @@ pub const DeployBuilder = struct {
 
     /// Build the deployment data (bytecode + encoded constructor args)
     pub fn buildDeploymentData(self: *DeployBuilder) ![]u8 {
-        var result = std.ArrayList(u8).init(self.allocator);
-        defer result.deinit();
+        var result = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer result.deinit(self.allocator);
 
         // Add bytecode
-        try result.appendSlice(self.bytecode.data);
+        try result.appendSlice(self.allocator, self.bytecode.data);
 
         // Encode constructor arguments if any
         if (self.constructor_args.items.len > 0) {
@@ -80,10 +80,10 @@ pub const DeployBuilder = struct {
             }
 
             const encoded_args = encoder.toSlice();
-            try result.appendSlice(encoded_args);
+            try result.appendSlice(self.allocator, encoded_args);
         }
 
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(self.allocator);
     }
 
     /// Estimate the contract address that will be created
@@ -155,7 +155,7 @@ test "deploy builder creation" {
         .{ .name = "initialSupply", .type = .uint256 },
     };
 
-    var builder = DeployBuilder.init(allocator, bytecode, &constructor_params);
+    var builder = try DeployBuilder.init(allocator, bytecode, &constructor_params);
     defer builder.deinit();
 
     try std.testing.expectEqual(@as(usize, 4), builder.bytecode.len());
@@ -166,7 +166,7 @@ test "deploy builder add arguments" {
 
     const bytecode = try Bytes.fromSlice(allocator, &[_]u8{ 0x60, 0x80 });
 
-    var builder = DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
+    var builder = try DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
     defer builder.deinit();
 
     try builder.addArg(.{ .uint = U256.fromInt(1000000) });
@@ -179,7 +179,7 @@ test "deploy builder set parameters" {
 
     const bytecode = try Bytes.fromSlice(allocator, &[_]u8{ 0x60, 0x80 });
 
-    var builder = DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
+    var builder = try DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
     defer builder.deinit();
 
     const from = Address.fromBytes([_]u8{0x12} ** 20);
@@ -198,7 +198,7 @@ test "deploy builder build data" {
     const bytecode_data = [_]u8{ 0x60, 0x80, 0x60, 0x40 };
     const bytecode = try Bytes.fromSlice(allocator, &bytecode_data);
 
-    var builder = DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
+    var builder = try DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
     defer builder.deinit();
 
     const deploy_data = try builder.buildDeploymentData();
@@ -214,7 +214,7 @@ test "estimate create2 address" {
 
     const bytecode = try Bytes.fromSlice(allocator, &[_]u8{ 0x60, 0x80 });
 
-    var builder = DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
+    var builder = try DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
     defer builder.deinit();
 
     const from = Address.fromBytes([_]u8{0x12} ** 20);
