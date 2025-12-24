@@ -258,7 +258,8 @@ pub const GasMiddleware = struct {
     /// Get gas price in gwei
     pub fn getGasPriceGwei(self: *GasMiddleware) !f64 {
         const price = try self.getGasPrice();
-        const gwei = @as(f64, @floatFromInt(price.toU64() catch 0)) / 1_000_000_000.0;
+        const price_u64 = uint_utils.u256ToU64(price) catch 0;
+        const gwei = @as(f64, @floatFromInt(price_u64)) / 1_000_000_000.0;
         return gwei;
     }
 };

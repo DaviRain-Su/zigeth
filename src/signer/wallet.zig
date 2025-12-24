@@ -177,8 +177,19 @@ pub const Wallet = struct {
 
                 // EIP-4844 specific
                 if (tx.type == .eip4844) {
-                    try encoder.appendItem(.{ .uint = 0 }); // max_fee_per_blob_gas (TODO)
-                    try encoder.appendItem(.{ .list = &[_]RlpItem{} }); // blob versioned hashes
+                    const blob_fee = u256ToU64(tx.max_fee_per_blob_gas orelse 0) catch 0;
+                    try encoder.appendItem(.{ .uint = blob_fee });
+                    // Encode blob versioned hashes as list of bytes32
+                    if (tx.blob_versioned_hashes) |hashes| {
+                        var hash_items = try self.allocator.alloc(RlpItem, hashes.len);
+                        defer self.allocator.free(hash_items);
+                        for (hashes, 0..) |h, i| {
+                            hash_items[i] = .{ .bytes = &h.bytes };
+                        }
+                        try encoder.appendItem(.{ .list = hash_items });
+                    } else {
+                        try encoder.appendItem(.{ .list = &[_]RlpItem{} });
+                    }
                 }
 
                 // EIP-7702 specific

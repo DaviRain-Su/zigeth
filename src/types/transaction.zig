@@ -115,6 +115,12 @@ pub const Transaction = struct {
     /// Authorization list (EIP-7702)
     authorization_list: ?AuthorizationList,
 
+    /// Max fee per blob gas (EIP-4844)
+    max_fee_per_blob_gas: ?u256,
+
+    /// Blob versioned hashes (EIP-4844)
+    blob_versioned_hashes: ?[]Hash,
+
     /// Transaction signature
     signature: ?Signature,
 
@@ -156,6 +162,8 @@ pub const Transaction = struct {
             .chain_id = null,
             .access_list = null,
             .authorization_list = null,
+            .max_fee_per_blob_gas = null,
+            .blob_versioned_hashes = null,
             .signature = null,
             .hash = null,
             .block_hash = null,
@@ -192,6 +200,8 @@ pub const Transaction = struct {
             .chain_id = chain_id,
             .access_list = access_list,
             .authorization_list = null,
+            .max_fee_per_blob_gas = null,
+            .blob_versioned_hashes = null,
             .signature = null,
             .hash = null,
             .block_hash = null,
@@ -227,6 +237,8 @@ pub const Transaction = struct {
             .chain_id = chain_id,
             .access_list = access_list,
             .authorization_list = null,
+            .max_fee_per_blob_gas = null,
+            .blob_versioned_hashes = null,
             .signature = null,
             .hash = null,
             .block_hash = null,
@@ -264,6 +276,49 @@ pub const Transaction = struct {
             .chain_id = chain_id,
             .access_list = access_list,
             .authorization_list = authorization_list,
+            .max_fee_per_blob_gas = null,
+            .blob_versioned_hashes = null,
+            .signature = null,
+            .hash = null,
+            .block_hash = null,
+            .block_number = null,
+            .transaction_index = null,
+            .allocator = allocator,
+        };
+    }
+
+    /// Create a new EIP-4844 transaction
+    pub fn newEip4844(
+        allocator: std.mem.Allocator,
+        to: ?Address,
+        value: u256,
+        data: Bytes,
+        nonce: u64,
+        gas_limit: u64,
+        max_fee_per_gas: u256,
+        max_priority_fee_per_gas: u256,
+        max_fee_per_blob_gas: u256,
+        chain_id: u64,
+        access_list: ?AccessList,
+        blob_versioned_hashes: []Hash,
+    ) !Transaction {
+        const hashes_copy = try allocator.dupe(Hash, blob_versioned_hashes);
+        return .{
+            .type = .eip4844,
+            .from = null,
+            .to = to,
+            .nonce = nonce,
+            .gas_limit = gas_limit,
+            .gas_price = null,
+            .max_fee_per_gas = max_fee_per_gas,
+            .max_priority_fee_per_gas = max_priority_fee_per_gas,
+            .value = value,
+            .data = data,
+            .chain_id = chain_id,
+            .access_list = access_list,
+            .authorization_list = null,
+            .max_fee_per_blob_gas = max_fee_per_blob_gas,
+            .blob_versioned_hashes = hashes_copy,
             .signature = null,
             .hash = null,
             .block_hash = null,
@@ -281,6 +336,9 @@ pub const Transaction = struct {
         }
         if (self.authorization_list) |list| {
             list.deinit();
+        }
+        if (self.blob_versioned_hashes) |hashes| {
+            self.allocator.free(hashes);
         }
     }
 
