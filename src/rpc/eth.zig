@@ -866,6 +866,32 @@ fn parseTransactionFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMa
         }
     }
 
+    // Parse EIP-4844 specific fields
+    var max_fee_per_blob_gas: ?u256 = null;
+    var blob_versioned_hashes: ?[]Hash = null;
+
+    if (tx_type == .eip4844) {
+        if (obj.get("maxFeePerBlobGas")) |blob_fee| {
+            if (blob_fee == .string) {
+                max_fee_per_blob_gas = try uint_utils.u256FromHex(blob_fee.string);
+            }
+        }
+        if (obj.get("blobVersionedHashes")) |hashes_val| {
+            if (hashes_val == .array) {
+                const hashes_array = hashes_val.array;
+                if (hashes_array.items.len > 0) {
+                    var hashes = try allocator.alloc(Hash, hashes_array.items.len);
+                    for (hashes_array.items, 0..) |hash_val, i| {
+                        if (hash_val == .string) {
+                            hashes[i] = try Hash.fromHex(hash_val.string);
+                        }
+                    }
+                    blob_versioned_hashes = hashes;
+                }
+            }
+        }
+    }
+
     // Create base transaction
     var tx = Transaction{
         .type = tx_type,
@@ -881,6 +907,8 @@ fn parseTransactionFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMa
         .chain_id = null,
         .access_list = null,
         .authorization_list = null,
+        .max_fee_per_blob_gas = max_fee_per_blob_gas,
+        .blob_versioned_hashes = blob_versioned_hashes,
         .signature = null,
         .hash = null,
         .block_hash = null,
@@ -1225,6 +1253,8 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
                 .chain_id = null,
                 .access_list = null,
                 .authorization_list = null,
+                .max_fee_per_blob_gas = null,
+                .blob_versioned_hashes = null,
                 .signature = null,
                 .hash = tx_hash,
                 .block_hash = null,

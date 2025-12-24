@@ -6,6 +6,7 @@ const rpc_client = @import("../rpc/client.zig");
 const abi = @import("../abi/types.zig");
 const encode = @import("../abi/encode.zig");
 const decode = @import("../abi/decode.zig");
+const hex = @import("../utils/hex.zig");
 
 /// ERC-4337 EntryPoint contract
 /// Supports v0.6, v0.7, and v0.8
@@ -60,23 +61,23 @@ pub const EntryPoint = struct {
         defer self.allocator.free(to_hex);
 
         // Convert call data to hex string
-        const data_hex = try std.fmt.allocPrint(self.allocator, "0x{s}", .{std.fmt.fmtSliceHexLower(call_data)});
+        const data_hex = try hex.bytesToHex(self.allocator, call_data);
         defer self.allocator.free(data_hex);
 
         // Build eth_call params
-        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
-        defer params_array.deinit(self.allocator);
+        var params_array = std.json.Array.init(self.allocator);
+        defer params_array.deinit();
 
         // Call object
         var call_obj = std.json.ObjectMap.init(self.allocator);
         try call_obj.put("to", .{ .string = to_hex });
         try call_obj.put("data", .{ .string = data_hex });
-        try params_array.append(self.allocator, .{ .object = call_obj });
+        try params_array.append(.{ .object = call_obj });
 
         // Block parameter (latest)
-        try params_array.append(self.allocator, .{ .string = "latest" });
+        try params_array.append(.{ .string = "latest" });
 
-        const params = std.json.Value{ .array = params_array.items };
+        const params = std.json.Value{ .array = params_array };
 
         // Make RPC call
         const response = try rpc.call("eth_call", params);
@@ -97,7 +98,7 @@ pub const EntryPoint = struct {
         defer self.allocator.free(from_hex);
 
         // Convert call data to hex string
-        const data_hex = try std.fmt.allocPrint(self.allocator, "0x{s}", .{std.fmt.fmtSliceHexLower(call_data)});
+        const data_hex = try hex.bytesToHex(self.allocator, call_data);
         defer self.allocator.free(data_hex);
 
         // Convert value to hex
@@ -105,8 +106,8 @@ pub const EntryPoint = struct {
         defer self.allocator.free(value_hex);
 
         // Build eth_sendTransaction params
-        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
-        defer params_array.deinit(self.allocator);
+        var params_array = std.json.Array.init(self.allocator);
+        defer params_array.deinit();
 
         // Transaction object
         var tx_obj = std.json.ObjectMap.init(self.allocator);
@@ -114,9 +115,9 @@ pub const EntryPoint = struct {
         try tx_obj.put("to", .{ .string = to_hex });
         try tx_obj.put("data", .{ .string = data_hex });
         try tx_obj.put("value", .{ .string = value_hex });
-        try params_array.append(self.allocator, .{ .object = tx_obj });
+        try params_array.append(.{ .object = tx_obj });
 
-        const params = std.json.Value{ .array = params_array.items };
+        const params = std.json.Value{ .array = params_array };
 
         // Make RPC call
         const response = try rpc.call("eth_sendTransaction", params);

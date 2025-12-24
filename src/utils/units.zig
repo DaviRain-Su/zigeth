@@ -84,9 +84,16 @@ pub fn etherToWei(ether: f64) !u256 {
 
 /// Convert wei to ether as a floating point
 pub fn weiToEther(wei: u256) !f64 {
-    const wei_u64 = u256ToU64(wei) catch return error.ValueTooLarge;
-    const wei_per_ether: f64 = 1_000_000_000_000_000_000.0;
-    return @as(f64, @floatFromInt(wei_u64)) / wei_per_ether;
+    const wei_per_ether: u256 = 1_000_000_000_000_000_000;
+    const ether_part = wei / wei_per_ether;
+    const remainder = wei % wei_per_ether;
+
+    // Convert integer part to f64 (may lose precision for very large values)
+    const ether_f64: f64 = @floatFromInt(ether_part);
+    const remainder_f64: f64 = @floatFromInt(remainder);
+    const wei_per_ether_f64: f64 = 1_000_000_000_000_000_000.0;
+
+    return ether_f64 + (remainder_f64 / wei_per_ether_f64);
 }
 
 /// Result of a wei conversion

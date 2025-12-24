@@ -69,19 +69,23 @@ pub const PaymasterClient = struct {
         defer context_obj.deinit();
         try context_obj.put("mode", .{ .string = mode.toString() });
 
+        // Serialize UserOperation to JSON string then parse to Value
+        const json_string = try std.json.Stringify.valueAlloc(self.allocator, user_op_json, .{});
+        defer self.allocator.free(json_string);
+
+        const parsed = try std.json.parseFromSlice(std.json.Value, self.allocator, json_string, .{});
+        defer parsed.deinit();
+        const user_op_value = parsed.value;
+
         // Build params array: [userOp, entryPoint, context]
-        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
-        defer params_array.deinit(self.allocator);
+        var params_array = std.json.Array.init(self.allocator);
+        defer params_array.deinit();
 
-        const user_op_value = try std.json.Value.jsonStringify(user_op_json, .{}, self.allocator);
-        defer if (user_op_value == .object) user_op_value.object.deinit();
+        try params_array.append(user_op_value);
+        try params_array.append(.{ .string = entry_point_hex });
+        try params_array.append(.{ .object = context_obj });
 
-        try params_array.append(self.allocator, user_op_value);
-        try params_array.append(self.allocator, .{ .string = entry_point_hex });
-        try params_array.append(self.allocator, .{ .object = context_obj });
-
-        const params = std.json.Value{ .array = try params_array.toOwnedSlice(self.allocator) };
-        defer params.array.deinit(self.allocator);
+        const params = std.json.Value{ .array = params_array };
 
         // Make RPC call
         const response = try self.rpc_client.call("pm_sponsorUserOperation", params);
@@ -167,28 +171,32 @@ pub const PaymasterClient = struct {
         defer self.allocator.free(entry_point_hex);
 
         // Convert token addresses to hex array
-        var token_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
-        defer token_array.deinit(self.allocator);
+        var token_array = std.json.Array.init(self.allocator);
+        defer token_array.deinit();
 
         for (tokens) |token| {
             const token_hex = try token.toHex(self.allocator);
             defer self.allocator.free(token_hex);
-            try token_array.append(self.allocator, .{ .string = try self.allocator.dupe(u8, token_hex) });
+            try token_array.append(.{ .string = try self.allocator.dupe(u8, token_hex) });
         }
 
+        // Serialize UserOperation to JSON string then parse to Value
+        const json_string = try std.json.Stringify.valueAlloc(self.allocator, user_op_json, .{});
+        defer self.allocator.free(json_string);
+
+        const parsed = try std.json.parseFromSlice(std.json.Value, self.allocator, json_string, .{});
+        defer parsed.deinit();
+        const user_op_value = parsed.value;
+
         // Build params array: [userOp, entryPoint, tokens]
-        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
-        defer params_array.deinit(self.allocator);
+        var params_array = std.json.Array.init(self.allocator);
+        defer params_array.deinit();
 
-        const user_op_value = try std.json.Value.jsonStringify(user_op_json, .{}, self.allocator);
-        defer if (user_op_value == .object) user_op_value.object.deinit();
+        try params_array.append(user_op_value);
+        try params_array.append(.{ .string = entry_point_hex });
+        try params_array.append(.{ .array = token_array });
 
-        try params_array.append(self.allocator, user_op_value);
-        try params_array.append(self.allocator, .{ .string = entry_point_hex });
-        try params_array.append(self.allocator, .{ .array = try token_array.toOwnedSlice(self.allocator) });
-
-        const params = std.json.Value{ .array = try params_array.toOwnedSlice(self.allocator) };
-        defer params.array.deinit(self.allocator);
+        const params = std.json.Value{ .array = params_array };
 
         // Make RPC call
         const response = try self.rpc_client.call("pm_getERC20TokenQuotes", params);

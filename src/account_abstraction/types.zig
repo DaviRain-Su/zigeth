@@ -1,6 +1,7 @@
 const std = @import("std");
 const primitives = @import("../primitives/address.zig");
 const Hash = @import("../primitives/hash.zig").Hash;
+const hex_utils = @import("../utils/hex.zig");
 
 /// EntryPoint version
 pub const EntryPointVersion = enum {
@@ -461,8 +462,7 @@ fn bytesToHex(allocator: std.mem.Allocator, bytes: []const u8) ![]const u8 {
         return try allocator.dupe(u8, "0x");
     }
 
-    const hex = try std.fmt.allocPrint(allocator, "0x{s}", .{std.fmt.fmtSliceHexLower(bytes)});
-    return hex;
+    return try hex_utils.bytesToHex(allocator, bytes);
 }
 
 /// Convert hex string to bytes

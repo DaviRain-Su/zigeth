@@ -114,7 +114,7 @@ pub fn encodeFunctionCall(
     // Add function selector (first 4 bytes)
     const selector = try function.getSelector(allocator);
     defer allocator.free(selector);
-    try encoder.buffer.appendSlice(selector);
+    try encoder.buffer.appendSlice(allocator, selector);
 
     // Encode arguments
     for (args, function.inputs) |arg, param| {

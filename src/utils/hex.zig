@@ -25,18 +25,32 @@ pub fn hexToBytes(allocator: std.mem.Allocator, hex_str: []const u8) ![]u8 {
         start = 2;
     }
 
-    const hex_len = hex_str.len - start;
-    if (hex_len % 2 != 0) {
-        return error.InvalidHexLength;
-    }
+    const hex_part = hex_str[start..];
+    const hex_len = hex_part.len;
 
-    const result = try allocator.alloc(u8, hex_len / 2);
+    // Handle odd-length hex strings by padding with leading zero
+    const is_odd = hex_len % 2 != 0;
+    const result_len = (hex_len + 1) / 2;
+
+    const result = try allocator.alloc(u8, result_len);
     errdefer allocator.free(result);
 
-    for (0..result.len) |i| {
-        const high = try hexCharToNibble(hex_str[start + i * 2]);
-        const low = try hexCharToNibble(hex_str[start + i * 2 + 1]);
-        result[i] = (high << 4) | low;
+    if (is_odd) {
+        // First byte comes from a single nibble (padded with 0)
+        result[0] = try hexCharToNibble(hex_part[0]);
+        // Process remaining pairs
+        for (1..result_len) |i| {
+            const high = try hexCharToNibble(hex_part[i * 2 - 1]);
+            const low = try hexCharToNibble(hex_part[i * 2]);
+            result[i] = (high << 4) | low;
+        }
+    } else {
+        // Even length - process pairs normally
+        for (0..result_len) |i| {
+            const high = try hexCharToNibble(hex_part[i * 2]);
+            const low = try hexCharToNibble(hex_part[i * 2 + 1]);
+            result[i] = (high << 4) | low;
+        }
     }
 
     return result;

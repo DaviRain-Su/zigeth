@@ -155,7 +155,7 @@ pub const SignerMiddleware = struct {
         var stub = try self.allocator.alloc(u8, 65);
         @memcpy(stub[0..32], &sig.r);
         @memcpy(stub[32..64], &sig.s);
-        stub[64] = sig.v;
+        stub[64] = @intCast(sig.v);
 
         return stub;
     }

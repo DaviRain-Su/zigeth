@@ -181,7 +181,7 @@ pub fn formatError(
     err: anyerror,
     context: ?ErrorContext,
 ) ![]const u8 {
-    var result = try std.ArrayList(u8).initCapacity(allocator, 0);
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     const writer = result.writer(allocator);
@@ -338,7 +338,7 @@ pub const ErrorFormatter = struct {
         err: anyerror,
         context: ?ErrorContext,
     ) ![]const u8 {
-        var result = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        var result: std.ArrayList(u8) = .empty;
         errdefer result.deinit(self.allocator);
 
         try result.appendSlice(self.allocator, "{");
@@ -376,7 +376,7 @@ pub const ErrorFormatter = struct {
         err: anyerror,
         context: ?ErrorContext,
     ) ![]const u8 {
-        var result = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        var result: std.ArrayList(u8) = .empty;
         errdefer result.deinit(self.allocator);
 
         const writer = result.writer(self.allocator);
@@ -415,7 +415,7 @@ pub const ErrorFormatter = struct {
         err: anyerror,
         context: ?ErrorContext,
     ) ![]const u8 {
-        var result = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        var result: std.ArrayList(u8) = .empty;
         errdefer result.deinit(self.allocator);
 
         const writer = result.writer(self.allocator);

@@ -245,16 +245,16 @@ pub const SmartAccount = struct {
         const rpc = self.rpc_client orelse return false;
 
         // Get code at address using eth_getCode
-        var params_array = try std.ArrayList(std.json.Value).initCapacity(self.allocator, 0);
-        defer params_array.deinit(self.allocator);
+        var params_array = std.json.Array.init(self.allocator);
+        defer params_array.deinit();
 
         const address_hex = try self.address.toHex(self.allocator);
         defer self.allocator.free(address_hex);
 
-        try params_array.append(self.allocator, .{ .string = address_hex });
-        try params_array.append(self.allocator, .{ .string = "latest" });
+        try params_array.append(.{ .string = address_hex });
+        try params_array.append(.{ .string = "latest" });
 
-        const params = std.json.Value{ .array = params_array.items };
+        const params = std.json.Value{ .array = params_array };
 
         const response = try rpc.call("eth_getCode", params);
         const code_hex = response.string;

@@ -39,10 +39,8 @@ pub const RpcClient = struct {
         const request = try types.JsonRpcRequest.init(self.allocator, method, params, id);
 
         // Serialize request to JSON
-        var request_str = try std.ArrayList(u8).initCapacity(self.allocator, 0);
-        defer request_str.deinit();
-
-        try std.json.stringify(request, .{}, request_str.writer());
+        const request_str = try std.json.Stringify.valueAlloc(self.allocator, request, .{});
+        defer self.allocator.free(request_str);
 
         // Make HTTP request
         var transport = try HttpTransport.init(self.allocator, self.endpoint);
@@ -50,7 +48,7 @@ pub const RpcClient = struct {
 
         try transport.addHeader("Content-Type", "application/json");
 
-        const response_body = try transport.send(request_str.items);
+        const response_body = try transport.send(request_str);
         defer self.allocator.free(response_body);
 
         // Parse response
@@ -102,9 +100,10 @@ pub const RpcClient = struct {
     }
 };
 
-/// HTTP transport for RPC client
+/// HTTP transport for RPC client (Zig 0.15.x compatible)
 pub const HttpTransport = struct {
     allocator: std.mem.Allocator,
+    client: std.http.Client,
     url: []const u8,
     headers: std.StringHashMap([]const u8),
 
@@ -112,12 +111,14 @@ pub const HttpTransport = struct {
         const url_copy = try allocator.dupe(u8, url);
         return .{
             .allocator = allocator,
+            .client = std.http.Client{ .allocator = allocator },
             .url = url_copy,
             .headers = std.StringHashMap([]const u8).init(allocator),
         };
     }
 
     pub fn deinit(self: *HttpTransport) void {
+        self.client.deinit();
         self.allocator.free(self.url);
 
         var it = self.headers.iterator();
@@ -135,58 +136,49 @@ pub const HttpTransport = struct {
     }
 
     pub fn send(self: *HttpTransport, request: []const u8) ![]u8 {
-        // Parse URL
-        const uri = try std.Uri.parse(self.url);
-
-        // Create HTTP client
-        var client = std.http.Client{ .allocator = self.allocator };
-        defer client.deinit();
+        // Use arena allocator for temporary allocations
+        var arena = std.heap.ArenaAllocator.init(self.allocator);
+        defer arena.deinit();
+        const alloc = arena.allocator();
 
         // Build extra headers array
-        var extra_headers_list = try std.ArrayList(std.http.Header).initCapacity(self.allocator, 0);
-        defer extra_headers_list.deinit();
+        var header_list = try std.ArrayList(std.http.Header).initCapacity(alloc, 0);
+        defer header_list.deinit(alloc);
 
         var it = self.headers.iterator();
         while (it.next()) |entry| {
-            try extra_headers_list.append(.{
+            try header_list.append(alloc, .{
                 .name = entry.key_ptr.*,
                 .value = entry.value_ptr.*,
             });
         }
 
-        // Prepare headers
-        var header_buffer: [4096]u8 = undefined;
-        var req = try client.open(.POST, uri, .{
-            .server_header_buffer = &header_buffer,
-            .extra_headers = extra_headers_list.items,
+        // Create response writer
+        var body_writer = std.io.Writer.Allocating.init(alloc);
+        defer body_writer.deinit();
+
+        // Make HTTP request using fetch API (Zig 0.15.x)
+        const fetch_result = try self.client.fetch(.{
+            .location = .{ .url = self.url },
+            .method = .POST,
+            .payload = request,
+            .extra_headers = header_list.items,
+            .response_writer = &body_writer.writer,
+            .keep_alive = false,
         });
-        defer req.deinit();
-
-        // Set transfer encoding
-        req.transfer_encoding = .chunked;
-
-        try req.send();
-
-        // Write body
-        try req.writeAll(request);
-        try req.finish();
-
-        // Wait for response
-        try req.wait();
 
         // Check status
-        if (req.response.status != .ok) {
+        const status = @intFromEnum(fetch_result.status);
+        if (status < 200 or status >= 300) {
             return error.HttpRequestFailed;
         }
 
-        // Read response body
-        var response_body = try std.ArrayList(u8).initCapacity(self.allocator, 0);
-        defer response_body.deinit();
+        // Copy response body to caller's allocator
+        const written = body_writer.written();
+        const response_bytes = try self.allocator.alloc(u8, written.len);
+        @memcpy(response_bytes, written);
 
-        const max_size = 10 * 1024 * 1024; // 10 MB max
-        try req.reader().readAllArrayList(&response_body, max_size);
-
-        return try response_body.toOwnedSlice(self.allocator);
+        return response_bytes;
     }
 };
 
