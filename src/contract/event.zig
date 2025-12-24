@@ -239,7 +239,7 @@ test "deploy builder creation" {
         .{ .name = "initialSupply", .type = .uint256 },
     };
 
-    var builder = DeployBuilder.init(allocator, bytecode, &constructor_params);
+    var builder = try DeployBuilder.init(allocator, bytecode, &constructor_params);
     defer builder.deinit();
 
     try std.testing.expectEqual(@as(usize, 2), builder.bytecode.len());
@@ -250,10 +250,10 @@ test "deploy builder with arguments" {
 
     const bytecode = try Bytes.fromSlice(allocator, &[_]u8{ 0x60, 0x80 });
 
-    var builder = DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
+    var builder = try DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
     defer builder.deinit();
 
-    try builder.addArg(.{ .uint = U256.fromInt(1000000) });
+    try builder.addArg(.{ .uint = 1000000 });
     try builder.addArg(.{ .address = Address.fromBytes([_]u8{0x12} ** 20) });
 
     try std.testing.expectEqual(@as(usize, 2), builder.constructor_args.items.len);
@@ -302,7 +302,7 @@ test "create2 address estimation" {
 
     const bytecode = try Bytes.fromSlice(allocator, &[_]u8{ 0x60, 0x80 });
 
-    var builder = DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
+    var builder = try DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
     defer builder.deinit();
 
     const from = Address.fromBytes([_]u8{0x12} ** 20);

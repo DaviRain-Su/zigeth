@@ -87,7 +87,7 @@ pub const UserOperationV07 = struct {
             try init_code.appendSlice(allocator, self.factoryData);
         }
 
-        const init_code_slice = try init_code.toOwnedSlice();
+        const init_code_slice = try init_code.toOwnedSlice(allocator);
 
         // Combine paymaster fields into paymasterAndData
         var paymaster_and_data = try std.ArrayList(u8).initCapacity(allocator, 0);
@@ -237,11 +237,11 @@ pub const UserOperationJson = struct {
             // v0.7/v0.8: need to combine fields
             // Combine factory + factoryData into initCode
             if (user_op.factory) |factory| {
-                var init_code_data = std.array_list.Managed(u8).init(allocator);
-                errdefer init_code_data.deinit();
-                try init_code_data.appendSlice(&factory.bytes);
-                try init_code_data.appendSlice(user_op.factoryData);
-                const init_code_bytes = try init_code_data.toOwnedSlice();
+                var init_code_data = try std.ArrayList(u8).initCapacity(allocator, 0);
+                errdefer init_code_data.deinit(allocator);
+                try init_code_data.appendSlice(allocator, &factory.bytes);
+                try init_code_data.appendSlice(allocator, user_op.factoryData);
+                const init_code_bytes = try init_code_data.toOwnedSlice(allocator);
                 defer allocator.free(init_code_bytes);
                 init_code_hex = try bytesToHex(allocator, init_code_bytes);
             } else {
@@ -250,24 +250,24 @@ pub const UserOperationJson = struct {
 
             // Combine paymaster fields into paymasterAndData
             if (user_op.paymaster) |paymaster| {
-                var paymaster_data = std.array_list.Managed(u8).init(allocator);
-                errdefer paymaster_data.deinit();
-                try paymaster_data.appendSlice(&paymaster.bytes);
+                var paymaster_data = try std.ArrayList(u8).initCapacity(allocator, 0);
+                errdefer paymaster_data.deinit(allocator);
+                try paymaster_data.appendSlice(allocator, &paymaster.bytes);
 
                 // Add verification gas limit (16 bytes, u128)
                 var ver_gas_bytes: [16]u8 = undefined;
                 std.mem.writeInt(u128, &ver_gas_bytes, user_op.paymasterVerificationGasLimit, .big);
-                try paymaster_data.appendSlice(&ver_gas_bytes);
+                try paymaster_data.appendSlice(allocator, &ver_gas_bytes);
 
                 // Add post-op gas limit (16 bytes, u128)
                 var post_gas_bytes: [16]u8 = undefined;
                 std.mem.writeInt(u128, &post_gas_bytes, user_op.paymasterPostOpGasLimit, .big);
-                try paymaster_data.appendSlice(&post_gas_bytes);
+                try paymaster_data.appendSlice(allocator, &post_gas_bytes);
 
                 // Add paymaster-specific data
-                try paymaster_data.appendSlice(user_op.paymasterData);
+                try paymaster_data.appendSlice(allocator, user_op.paymasterData);
 
-                const paymaster_bytes = try paymaster_data.toOwnedSlice();
+                const paymaster_bytes = try paymaster_data.toOwnedSlice(allocator);
                 defer allocator.free(paymaster_bytes);
                 paymaster_and_data_hex = try bytesToHex(allocator, paymaster_bytes);
             } else {
@@ -384,28 +384,28 @@ pub const PaymasterData = struct {
     /// Pack paymaster data into bytes (v0.7+ format)
     /// Format: paymaster_address (20 bytes) + verificationGasLimit (16 bytes) + postOpGasLimit (16 bytes) + data
     pub fn pack(self: PaymasterData, allocator: std.mem.Allocator) ![]u8 {
-        var packed_data = std.array_list.Managed(u8).init(allocator);
-        errdefer packed_data.deinit();
+        var packed_data = try std.ArrayList(u8).initCapacity(allocator, 0);
+        errdefer packed_data.deinit(allocator);
 
         // Paymaster address (20 bytes)
-        try packed_data.appendSlice(&self.paymaster.bytes);
+        try packed_data.appendSlice(allocator, &self.paymaster.bytes);
 
         // Verification gas limit (16 bytes, u128)
         var ver_gas_bytes: [16]u8 = undefined;
         const ver_gas_u128: u128 = @intCast(self.verificationGasLimit);
         std.mem.writeInt(u128, &ver_gas_bytes, ver_gas_u128, .big);
-        try packed_data.appendSlice(&ver_gas_bytes);
+        try packed_data.appendSlice(allocator, &ver_gas_bytes);
 
         // Post-op gas limit (16 bytes, u128)
         var post_gas_bytes: [16]u8 = undefined;
         const post_gas_u128: u128 = @intCast(self.postOpGasLimit);
         std.mem.writeInt(u128, &post_gas_bytes, post_gas_u128, .big);
-        try packed_data.appendSlice(&post_gas_bytes);
+        try packed_data.appendSlice(allocator, &post_gas_bytes);
 
         // Paymaster-specific data
-        try packed_data.appendSlice(self.data);
+        try packed_data.appendSlice(allocator, self.data);
 
-        return try packed_data.toOwnedSlice();
+        return try packed_data.toOwnedSlice(allocator);
     }
 
     /// Unpack paymaster data from bytes (v0.7+ format)

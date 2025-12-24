@@ -51,7 +51,7 @@ pub const Provider = struct {
     }
 
     /// Get the endpoint URL
-    pub fn getEndpoint(self: *Provider) []const u8 {
+    pub fn getEndpoint(self: *const Provider) []const u8 {
         return self.rpc_client.endpoint;
     }
 
@@ -190,11 +190,17 @@ test "provider creation" {
 test "provider has all namespaces" {
     const allocator = std.testing.allocator;
 
-    const provider = try Provider.init(allocator, "http://localhost:8545");
+    var provider = try Provider.init(allocator, "http://localhost:8545");
     defer provider.deinit();
 
-    try std.testing.expect(provider.eth.client.endpoint.len > 0);
-    try std.testing.expect(provider.net.client.endpoint.len > 0);
-    try std.testing.expect(provider.web3.client.endpoint.len > 0);
-    try std.testing.expect(provider.debug.client.endpoint.len > 0);
+    // Test that we can get all namespaces and they reference the client
+    const eth = provider.getEth();
+    const net = provider.getNet();
+    const web3 = provider.getWeb3();
+    const debug = provider.getDebug();
+
+    try std.testing.expect(eth.client.endpoint.len > 0);
+    try std.testing.expect(net.client.endpoint.len > 0);
+    try std.testing.expect(web3.client.endpoint.len > 0);
+    try std.testing.expect(debug.client.endpoint.len > 0);
 }

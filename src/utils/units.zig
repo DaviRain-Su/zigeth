@@ -51,7 +51,8 @@ pub fn fromWei(wei: U256, unit: Unit) !WeiConversion {
     const mult = unit.multiplier();
 
     // Divide wei by multiplier
-    const div_result = wei.divScalar(mult.toU64() catch return error.UnitTooLarge);
+    const mult_u64 = mult.tryToU64() catch return error.UnitTooLarge;
+    const div_result = wei.divScalar(mult_u64);
 
     return WeiConversion{
         .integer_part = div_result.quotient,
@@ -63,7 +64,7 @@ pub fn fromWei(wei: U256, unit: Unit) !WeiConversion {
 /// Convert to wei from another unit
 pub fn toWei(amount: u64, unit: Unit) U256 {
     const mult = unit.multiplier();
-    return U256.fromInt(amount).mulScalar(mult.toU64() catch unreachable);
+    return U256.fromInt(amount).mulScalar(mult.toU64());
 }
 
 /// Convert to wei from a floating point amount (ether)
@@ -123,7 +124,7 @@ pub const WeiConversion = struct {
         // Calculate decimal part
         const mult = self.unit.multiplier();
         const remainder_u64 = self.remainder_wei.toU64();
-        const divisor = mult.toU64() catch return error.UnitTooLarge;
+        const divisor = mult.tryToU64() catch return error.UnitTooLarge;
 
         // Convert remainder to decimal string
         const decimal_value = (@as(f64, @floatFromInt(remainder_u64)) / @as(f64, @floatFromInt(divisor))) *
@@ -131,11 +132,27 @@ pub const WeiConversion = struct {
 
         const decimal_int = @as(u64, @intFromFloat(decimal_value));
 
-        return try std.fmt.allocPrint(
-            allocator,
-            "{s}.{d:0>[1]}",
-            .{ integer_str, decimal_int, decimal_places },
-        );
+        // Format with appropriate decimal places using allocPrint
+        const decimal_str = try std.fmt.allocPrint(allocator, "{d}", .{decimal_int});
+        defer allocator.free(decimal_str);
+
+        // Pad with zeros if needed
+        var result = try std.ArrayList(u8).initCapacity(allocator, 0);
+        errdefer result.deinit(allocator);
+
+        try result.appendSlice(allocator, integer_str);
+        try result.append(allocator, '.');
+
+        // Add leading zeros if decimal is shorter than decimal_places
+        if (decimal_str.len < decimal_places) {
+            var zeros_needed = decimal_places - decimal_str.len;
+            while (zeros_needed > 0) : (zeros_needed -= 1) {
+                try result.append(allocator, '0');
+            }
+        }
+        try result.appendSlice(allocator, decimal_str);
+
+        return try result.toOwnedSlice(allocator);
     }
 };
 

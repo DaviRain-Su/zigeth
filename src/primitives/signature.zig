@@ -2,14 +2,14 @@ const std = @import("std");
 const hex = @import("../utils/hex.zig");
 
 /// ECDSA signature for Ethereum transactions
-/// Consists of r (32 bytes), s (32 bytes), and v (1 byte recovery id)
+/// Consists of r (32 bytes), s (32 bytes), and v (recovery id, can be > 255 for EIP-155)
 pub const Signature = struct {
     r: [32]u8,
     s: [32]u8,
-    v: u8,
+    v: u64,
 
     /// Create signature from components
-    pub fn init(r: [32]u8, s: [32]u8, v: u8) Signature {
+    pub fn init(r: [32]u8, s: [32]u8, v: u64) Signature {
         return .{
             .r = r,
             .s = s,
@@ -40,11 +40,12 @@ pub const Signature = struct {
     }
 
     /// Convert signature to bytes (65 bytes: r + s + v)
+    /// Note: For EIP-155 signatures with v > 255, only the lower 8 bits are stored
     pub fn toBytes(self: Signature, allocator: std.mem.Allocator) ![]u8 {
         const result = try allocator.alloc(u8, 65);
         @memcpy(result[0..32], &self.r);
         @memcpy(result[32..64], &self.s);
-        result[64] = self.v;
+        result[64] = @truncate(self.v);
         return result;
     }
 
@@ -56,11 +57,16 @@ pub const Signature = struct {
     }
 
     /// Get compact form (without chain ID for legacy signatures)
+    /// Returns 0 or 1 (the recovery ID)
     pub fn getCompactV(self: Signature) u8 {
-        if (self.v >= 27) {
-            return self.v - 27;
+        if (self.v >= 35) {
+            // EIP-155: v = chain_id * 2 + 35 + recovery_id
+            return @truncate((self.v - 35) % 2);
+        } else if (self.v >= 27) {
+            // Legacy: v = 27 or 28
+            return @truncate(self.v - 27);
         }
-        return self.v;
+        return @truncate(self.v);
     }
 
     /// Get recovery ID (0 or 1)
@@ -77,8 +83,8 @@ pub const Signature = struct {
     }
 
     /// Create EIP-155 compliant v value
-    pub fn eip155V(chain_id: u64, recovery_id: u8) u8 {
-        return @intCast(chain_id * 2 + 35 + recovery_id);
+    pub fn eip155V(chain_id: u64, recovery_id: u8) u64 {
+        return chain_id * 2 + 35 + recovery_id;
     }
 
     /// Verify signature is valid (basic checks)
@@ -200,11 +206,11 @@ test "signature equality" {
 
 test "eip155 v calculation" {
     // Mainnet (chain_id=1) with recovery_id=0
-    try std.testing.expectEqual(@as(u8, 37), Signature.eip155V(1, 0));
+    try std.testing.expectEqual(@as(u64, 37), Signature.eip155V(1, 0));
 
     // Mainnet (chain_id=1) with recovery_id=1
-    try std.testing.expectEqual(@as(u8, 38), Signature.eip155V(1, 1));
+    try std.testing.expectEqual(@as(u64, 38), Signature.eip155V(1, 1));
 
     // Polygon (chain_id=137) with recovery_id=0
-    try std.testing.expectEqual(@as(u8, 309), Signature.eip155V(137, 0));
+    try std.testing.expectEqual(@as(u64, 309), Signature.eip155V(137, 0));
 }

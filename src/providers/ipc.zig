@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Provider = @import("./provider.zig").Provider;
 
 /// IPC provider for local Ethereum nodes (Unix socket communication)
@@ -46,7 +47,7 @@ pub const IpcProvider = struct {
         }
 
         // Check OS support for Unix sockets
-        if (std.builtin.os.tag == .windows) {
+        if (builtin.os.tag == .windows) {
             // Windows uses named pipes, not Unix sockets
             return error.WindowsNamedPipesNotSupported;
         }
@@ -133,7 +134,7 @@ pub const SocketPaths = struct {
 
     /// Get default path for current OS
     pub fn getDefault() []const u8 {
-        return switch (std.builtin.os.tag) {
+        return switch (builtin.os.tag) {
             .linux => GETH_UNIX,
             .macos => GETH_MACOS,
             .windows => GETH_WINDOWS,
@@ -145,7 +146,7 @@ pub const SocketPaths = struct {
 test "ipc provider creation" {
     const allocator = std.testing.allocator;
 
-    const provider = try IpcProvider.init(allocator, "/tmp/geth.ipc");
+    var provider = try IpcProvider.init(allocator, "/tmp/geth.ipc");
     defer provider.deinit();
 
     try std.testing.expectEqualStrings("/tmp/geth.ipc", provider.getSocketPath());
@@ -222,7 +223,7 @@ test "ipc provider sendRequest when not connected" {
 }
 
 test "ipc provider windows named pipes not supported" {
-    if (std.builtin.os.tag != .windows) return error.SkipZigTest;
+    if (builtin.os.tag != .windows) return error.SkipZigTest;
 
     const allocator = std.testing.allocator;
 

@@ -418,29 +418,29 @@ const WsClient = struct {
         const stream = self.stream orelse return error.NotConnected;
 
         // Build WebSocket frame (text frame, no masking for simplicity)
-        var frame = std.array_list.Managed(u8).init(self.allocator);
-        defer frame.deinit();
+        var frame = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer frame.deinit(self.allocator);
 
         // Opcode: text frame (0x81)
-        try frame.append(0x81);
+        try frame.append(self.allocator, 0x81);
 
         // Payload length
         if (message.len < 126) {
-            try frame.append(@intCast(message.len));
+            try frame.append(self.allocator, @intCast(message.len));
         } else if (message.len < 65536) {
-            try frame.append(126);
-            try frame.append(@intCast(message.len >> 8));
-            try frame.append(@intCast(message.len & 0xFF));
+            try frame.append(self.allocator, 126);
+            try frame.append(self.allocator, @intCast(message.len >> 8));
+            try frame.append(self.allocator, @intCast(message.len & 0xFF));
         } else {
-            try frame.append(127);
+            try frame.append(self.allocator, 127);
             var i: usize = 7;
             while (i >= 0) : (i -= 1) {
-                try frame.append(@intCast((message.len >> @intCast(i * 8)) & 0xFF));
+                try frame.append(self.allocator, @intCast((message.len >> @intCast(i * 8)) & 0xFF));
             }
         }
 
         // Payload
-        try frame.appendSlice(message);
+        try frame.appendSlice(self.allocator, message);
 
         // Send frame
         _ = try stream.write(frame.items);
@@ -453,8 +453,8 @@ const WsClient = struct {
     pub fn receiveMessage(self: *WsClient) ![]u8 {
         const stream = self.stream orelse return error.NotConnected;
 
-        var response = std.array_list.Managed(u8).init(self.allocator);
-        errdefer response.deinit();
+        var response = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        errdefer response.deinit(self.allocator);
 
         // Read frame header
         var header: [2]u8 = undefined;
@@ -481,18 +481,18 @@ const WsClient = struct {
         }
 
         // Read payload
-        try response.ensureTotalCapacity(@intCast(payload_len));
+        try response.ensureTotalCapacity(self.allocator, @intCast(payload_len));
         var remaining = payload_len;
         while (remaining > 0) {
             var buf: [4096]u8 = undefined;
             const to_read = @min(remaining, buf.len);
             const bytes_read = try stream.read(buf[0..to_read]);
             if (bytes_read == 0) break;
-            try response.appendSlice(buf[0..bytes_read]);
+            try response.appendSlice(self.allocator, buf[0..bytes_read]);
             remaining -= bytes_read;
         }
 
-        return response.toOwnedSlice();
+        return response.toOwnedSlice(self.allocator);
     }
 };
 

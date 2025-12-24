@@ -2,7 +2,7 @@ const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
 const Signature = @import("../primitives/signature.zig").Signature;
-const U256 = @import("../primitives/uint.zig").U256;
+const u256ToU64 = @import("../primitives/uint.zig").u256ToU64;
 const Transaction = @import("../types/transaction.zig").Transaction;
 const PrivateKey = @import("../crypto/secp256k1.zig").PrivateKey;
 const PublicKey = @import("../crypto/secp256k1.zig").PublicKey;
@@ -122,7 +122,7 @@ pub const Wallet = struct {
                 // Legacy transaction with EIP-155
                 try encoder.startList();
                 try encoder.appendItem(.{ .uint = tx.nonce });
-                try encoder.appendItem(.{ .uint = tx.gas_price.toU64() catch 0 });
+                try encoder.appendItem(.{ .uint = u256ToU64(tx.gas_price orelse 0) catch 0 });
                 try encoder.appendItem(.{ .uint = tx.gas_limit });
 
                 if (tx.to) |to_addr| {
@@ -131,8 +131,8 @@ pub const Wallet = struct {
                     try encoder.appendItem(.{ .bytes = &[_]u8{} });
                 }
 
-                try encoder.appendItem(.{ .uint = tx.value.toU64() catch 0 });
-                try encoder.appendItem(.{ .bytes = tx.data });
+                try encoder.appendItem(.{ .uint = u256ToU64(tx.value) catch 0 });
+                try encoder.appendItem(.{ .bytes = tx.data.data });
 
                 // EIP-155: add chain_id, 0, 0
                 try encoder.appendItem(.{ .uint = chain_id });
@@ -152,11 +152,11 @@ pub const Wallet = struct {
 
                 switch (tx.transaction_type) {
                     .eip2930 => {
-                        try encoder.appendItem(.{ .uint = tx.gas_price.toU64() catch 0 });
+                        try encoder.appendItem(.{ .uint = u256ToU64(tx.gas_price orelse 0) catch 0 });
                     },
                     .eip1559, .eip4844, .eip7702 => {
-                        try encoder.appendItem(.{ .uint = tx.max_priority_fee_per_gas.toU64() catch 0 });
-                        try encoder.appendItem(.{ .uint = tx.max_fee_per_gas.toU64() catch 0 });
+                        try encoder.appendItem(.{ .uint = u256ToU64(tx.max_priority_fee_per_gas orelse 0) catch 0 });
+                        try encoder.appendItem(.{ .uint = u256ToU64(tx.max_fee_per_gas orelse 0) catch 0 });
                     },
                     else => unreachable,
                 }
@@ -169,15 +169,15 @@ pub const Wallet = struct {
                     try encoder.appendItem(.{ .bytes = &[_]u8{} });
                 }
 
-                try encoder.appendItem(.{ .uint = tx.value.toU64() catch 0 });
-                try encoder.appendItem(.{ .bytes = tx.data });
+                try encoder.appendItem(.{ .uint = u256ToU64(tx.value) catch 0 });
+                try encoder.appendItem(.{ .bytes = tx.data.data });
 
                 // Access list (empty for now)
                 try encoder.appendItem(.{ .list = &[_]RlpItem{} });
 
                 // EIP-4844 specific
                 if (tx.transaction_type == .eip4844) {
-                    try encoder.appendItem(.{ .uint = tx.max_fee_per_blob_gas.toU64() catch 0 });
+                    try encoder.appendItem(.{ .uint = 0 }); // max_fee_per_blob_gas (TODO)
                     try encoder.appendItem(.{ .list = &[_]RlpItem{} }); // blob versioned hashes
                 }
 
@@ -210,7 +210,7 @@ pub const Wallet = struct {
 
     /// Sign a message hash
     pub fn signHash(self: *Wallet, hash: [32]u8) !Signature {
-        return try self.signer.signHash(hash);
+        return try self.signer.signHash(Hash.fromBytes(hash));
     }
 
     /// Sign a message (with Ethereum prefix)
@@ -228,14 +228,14 @@ pub const Wallet = struct {
         @memcpy(data[34..66], &message_hash);
 
         const hash = keccak.hash(&data);
-        return try self.signer.signHash(hash.bytes);
+        return try self.signer.signHash(hash);
     }
 
     /// Verify a signature
     pub fn verifySignature(self: *Wallet, hash: [32]u8, signature: Signature) !bool {
         const ecdsa = @import("../crypto/ecdsa.zig");
-        const recovered_addr = try ecdsa.recoverAddress(hash, signature);
-        return recovered_addr.eql(self.address);
+        const recovered_addr = try ecdsa.recoverAddress(Hash.fromBytes(hash), signature);
+        return std.mem.eql(u8, &recovered_addr.bytes, &self.address.bytes);
     }
 
     /// Get signer interface

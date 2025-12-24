@@ -178,15 +178,15 @@ pub const ValueConversion = struct {
         const type_info = @typeInfo(T);
 
         return switch (type_info) {
-            .Int => |int_info| {
+            .int => |int_info| {
                 if (int_info.signedness == .unsigned) {
-                    return .{ .uint = @import("../primitives/uint.zig").U256.fromInt(@as(u64, @intCast(value))) };
+                    return .{ .uint = @as(u256, @intCast(value)) };
                 } else {
-                    return .{ .int = @import("../primitives/uint.zig").U256.fromInt(@as(u64, @intCast(@abs(value)))) };
+                    return .{ .int = @as(i256, @intCast(value)) };
                 }
             },
-            .Bool => .{ .bool_val = value },
-            .Pointer => |ptr_info| {
+            .bool => .{ .bool_val = value },
+            .pointer => |ptr_info| {
                 if (ptr_info.child == u8) {
                     // String or bytes
                     return .{ .bytes = value };
@@ -203,8 +203,8 @@ pub const ValueConversion = struct {
         return .{ .address = addr };
     }
 
-    /// Convert U256 to AbiValue
-    pub fn u256ToAbiValue(value: @import("../primitives/uint.zig").U256) abi.AbiValue {
+    /// Convert u256 to AbiValue
+    pub fn u256ToAbiValue(value: u256) abi.AbiValue {
         return .{ .uint = value };
     }
 };
@@ -254,8 +254,7 @@ test "value conversion uint" {
     const abi_val = ValueConversion.toAbiValue(u64, value);
 
     try std.testing.expect(abi_val == .uint);
-    const U256 = @import("../primitives/uint.zig").U256;
-    try std.testing.expect(abi_val.uint.eql(U256.fromInt(1000)));
+    try std.testing.expect(abi_val.uint == 1000);
 }
 
 test "value conversion bool" {

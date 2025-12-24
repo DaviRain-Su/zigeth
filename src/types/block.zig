@@ -78,7 +78,7 @@ pub const BlockHeader = struct {
     /// Check if this is a post-merge block (PoS)
     pub fn isPostMerge(self: BlockHeader) bool {
         // Post-merge blocks have difficulty = 0
-        return self.difficulty.isZero();
+        return self.difficulty == 0;
     }
 
     /// Check if this is a post-London block (has base fee)

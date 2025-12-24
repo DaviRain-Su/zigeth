@@ -187,8 +187,10 @@ pub fn recoverPublicKey(message_hash: Hash, signature: Signature) !PublicKey {
     var sig_bytes: [65]u8 = undefined;
     @memcpy(sig_bytes[0..32], &signature.r);
     @memcpy(sig_bytes[32..64], &signature.s);
-    // Convert Ethereum v (27-30) back to recovery ID (0-3)
-    sig_bytes[64] = signature.v - 27;
+    // Convert Ethereum v back to recovery ID (0-3)
+    // For legacy signatures (v = 27 or 28), recovery_id = v - 27
+    // For EIP-155 signatures (v >= 35), recovery_id = (v - 35) % 2
+    sig_bytes[64] = signature.getCompactV();
 
     const pubkey_65 = try ctx.recoverPubkey(message_hash.bytes, sig_bytes);
 

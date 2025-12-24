@@ -181,10 +181,10 @@ pub fn formatError(
     err: anyerror,
     context: ?ErrorContext,
 ) ![]const u8 {
-    var result = std.array_list.Managed(u8).init(allocator);
-    errdefer result.deinit();
+    var result = try std.ArrayList(u8).initCapacity(allocator, 0);
+    errdefer result.deinit(allocator);
 
-    const writer = result.writer();
+    const writer = result.writer(allocator);
 
     if (context) |ctx| {
         try writer.print("[{s}] ", .{ctx.module});
@@ -202,7 +202,7 @@ pub fn formatError(
         try writer.print("Error: {s}", .{@errorName(err)});
     }
 
-    return try result.toOwnedSlice();
+    return try result.toOwnedSlice(allocator);
 }
 
 /// Log error with context
@@ -338,36 +338,36 @@ pub const ErrorFormatter = struct {
         err: anyerror,
         context: ?ErrorContext,
     ) ![]const u8 {
-        var result = std.array_list.Managed(u8).init(self.allocator);
-        errdefer result.deinit();
+        var result = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        errdefer result.deinit(self.allocator);
 
-        try result.appendSlice("{");
-        try result.appendSlice("\"error\":\"");
-        try result.appendSlice(@errorName(err));
-        try result.appendSlice("\"");
+        try result.appendSlice(self.allocator, "{");
+        try result.appendSlice(self.allocator, "\"error\":\"");
+        try result.appendSlice(self.allocator, @errorName(err));
+        try result.appendSlice(self.allocator, "\"");
 
         if (context) |ctx| {
-            try result.appendSlice(",\"module\":\"");
-            try result.appendSlice(ctx.module);
-            try result.appendSlice("\",\"operation\":\"");
-            try result.appendSlice(ctx.operation);
-            try result.appendSlice("\"");
+            try result.appendSlice(self.allocator, ",\"module\":\"");
+            try result.appendSlice(self.allocator, ctx.module);
+            try result.appendSlice(self.allocator, "\",\"operation\":\"");
+            try result.appendSlice(self.allocator, ctx.operation);
+            try result.appendSlice(self.allocator, "\"");
 
             if (ctx.details) |details| {
-                try result.appendSlice(",\"details\":\"");
-                try result.appendSlice(details);
-                try result.appendSlice("\"");
+                try result.appendSlice(self.allocator, ",\"details\":\"");
+                try result.appendSlice(self.allocator, details);
+                try result.appendSlice(self.allocator, "\"");
             }
 
             if (ctx.code) |code| {
                 const code_str = try std.fmt.allocPrint(self.allocator, ",\"code\":{}", .{code});
                 defer self.allocator.free(code_str);
-                try result.appendSlice(code_str);
+                try result.appendSlice(self.allocator, code_str);
             }
         }
 
-        try result.appendSlice("}");
-        return try result.toOwnedSlice();
+        try result.appendSlice(self.allocator, "}");
+        return try result.toOwnedSlice(self.allocator);
     }
 
     /// Format error as human-readable text
@@ -376,10 +376,10 @@ pub const ErrorFormatter = struct {
         err: anyerror,
         context: ?ErrorContext,
     ) ![]const u8 {
-        var result = std.array_list.Managed(u8).init(self.allocator);
-        errdefer result.deinit();
+        var result = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        errdefer result.deinit(self.allocator);
 
-        const writer = result.writer();
+        const writer = result.writer(self.allocator);
 
         if (self.use_colors) {
             try writer.writeAll("\x1b[31m"); // Red
@@ -406,7 +406,7 @@ pub const ErrorFormatter = struct {
             }
         }
 
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(self.allocator);
     }
 
     /// Format error as structured log entry
@@ -415,10 +415,10 @@ pub const ErrorFormatter = struct {
         err: anyerror,
         context: ?ErrorContext,
     ) ![]const u8 {
-        var result = std.array_list.Managed(u8).init(self.allocator);
-        errdefer result.deinit();
+        var result = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        errdefer result.deinit(self.allocator);
 
-        const writer = result.writer();
+        const writer = result.writer(self.allocator);
 
         try writer.writeAll("[ERROR] ");
         try writer.writeAll(@errorName(err));
@@ -435,7 +435,7 @@ pub const ErrorFormatter = struct {
             }
         }
 
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(self.allocator);
     }
 };
 

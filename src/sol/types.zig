@@ -2,7 +2,6 @@ const std = @import("std");
 const abi = @import("../abi/types.zig");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
 const Bytes = @import("../primitives/bytes.zig").Bytes;
 
 /// Solidity type to Zig type mappings
@@ -49,11 +48,11 @@ pub const SolidityType = enum {
             .int64 => .int64,
             .int128 => .int128,
             .int256 => .int256,
-            .bytes1 => .{ .fixed_bytes = 1 },
-            .bytes2 => .{ .fixed_bytes = 2 },
-            .bytes4 => .{ .fixed_bytes = 4 },
-            .bytes8 => .{ .fixed_bytes = 8 },
-            .bytes16 => .{ .fixed_bytes = 16 },
+            .bytes1 => .bytes1,
+            .bytes2 => .bytes2,
+            .bytes4 => .bytes4,
+            .bytes8 => .bytes8,
+            .bytes16 => .bytes16,
             .bytes32 => .bytes32,
         };
     }
@@ -192,13 +191,13 @@ pub const SolidityValue = union(enum) {
     uint32: u32,
     uint64: u64,
     uint128: u128,
-    uint256: U256,
+    uint256: u256,
     int8: i8,
     int16: i16,
     int32: i32,
     int64: i64,
     int128: i128,
-    int256: U256, // Signed represented as U256 for now
+    int256: i256,
     fixed_bytes: []const u8,
 
     /// Convert to AbiValue
@@ -208,17 +207,17 @@ pub const SolidityValue = union(enum) {
             .bool_val => |b| .{ .bool_val = b },
             .string => |s| .{ .string = s },
             .bytes => |b| .{ .bytes = b },
-            .uint8 => |u| .{ .uint = U256.fromInt(u) },
-            .uint16 => |u| .{ .uint = U256.fromInt(u) },
-            .uint32 => |u| .{ .uint = U256.fromInt(u) },
-            .uint64 => |u| .{ .uint = U256.fromInt(u) },
-            .uint128 => |u| .{ .uint = U256.fromInt(u) },
+            .uint8 => |u| .{ .uint = @as(u256, u) },
+            .uint16 => |u| .{ .uint = @as(u256, u) },
+            .uint32 => |u| .{ .uint = @as(u256, u) },
+            .uint64 => |u| .{ .uint = @as(u256, u) },
+            .uint128 => |u| .{ .uint = @as(u256, u) },
             .uint256 => |u| .{ .uint = u },
-            .int8 => |i| .{ .int = U256.fromInt(@as(u64, @intCast(@abs(i)))) },
-            .int16 => |i| .{ .int = U256.fromInt(@as(u64, @intCast(@abs(i)))) },
-            .int32 => |i| .{ .int = U256.fromInt(@as(u64, @intCast(@abs(i)))) },
-            .int64 => |i| .{ .int = U256.fromInt(@as(u64, @intCast(@abs(i)))) },
-            .int128 => |i| .{ .int = U256.fromInt(@as(u64, @intCast(@abs(i)))) },
+            .int8 => |i| .{ .int = @as(i256, i) },
+            .int16 => |i| .{ .int = @as(i256, i) },
+            .int32 => |i| .{ .int = @as(i256, i) },
+            .int64 => |i| .{ .int = @as(i256, i) },
+            .int128 => |i| .{ .int = @as(i256, i) },
             .int256 => |i| .{ .int = i },
             .fixed_bytes => |b| .{ .bytes = b },
         };
@@ -726,9 +725,9 @@ test "erc721 interface" {
 }
 
 test "solidity value to abi value" {
-    const sol_val = SolidityValue{ .uint256 = U256.fromInt(1000) };
+    const sol_val = SolidityValue{ .uint256 = 1000 };
     const abi_val = sol_val.toAbiValue();
 
     try std.testing.expect(abi_val == .uint);
-    try std.testing.expect(abi_val.uint.eql(U256.fromInt(1000)));
+    try std.testing.expect(abi_val.uint == 1000);
 }

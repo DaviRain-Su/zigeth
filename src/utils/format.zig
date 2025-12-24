@@ -81,7 +81,7 @@ pub fn formatU256(allocator: std.mem.Allocator, value: U256) ![]u8 {
     // Handle zero case
     if (value.isZero()) {
         try result.append(allocator, '0');
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(allocator);
     }
 
     // Use a simple algorithm: repeatedly divide by 10
@@ -177,7 +177,7 @@ pub fn truncate(allocator: std.mem.Allocator, str: []const u8, max_length: usize
 test "format address short" {
     const allocator = std.testing.allocator;
 
-    const addr = Address.fromBytes([_]u8{0x12} ++ [_]u8{0x34} ** 9 ++ [_]u8{0x56});
+    const addr = Address.fromBytes([_]u8{0x12} ** 20);
     const formatted = try formatAddressShort(allocator, addr);
     defer allocator.free(formatted);
 

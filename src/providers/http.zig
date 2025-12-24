@@ -117,7 +117,7 @@ pub const Networks = struct {
 test "http provider creation" {
     const allocator = std.testing.allocator;
 
-    const provider = try HttpProvider.init(allocator, "http://localhost:8545");
+    var provider = try HttpProvider.init(allocator, "http://localhost:8545");
     defer provider.deinit();
 
     try std.testing.expectEqualStrings("http://localhost:8545", provider.provider.getEndpoint());
@@ -126,19 +126,19 @@ test "http provider creation" {
 test "http provider networks" {
     const allocator = std.testing.allocator;
 
-    const mainnet = try Networks.mainnet(allocator);
+    var mainnet = try Networks.mainnet(allocator);
     defer mainnet.deinit();
     try std.testing.expect(std.mem.indexOf(u8, mainnet.provider.getEndpoint(), "etherspot.io/v2/1") != null);
 
-    const sepolia = try Networks.sepolia(allocator);
+    var sepolia = try Networks.sepolia(allocator);
     defer sepolia.deinit();
     try std.testing.expect(std.mem.indexOf(u8, sepolia.provider.getEndpoint(), "etherspot.io/v2/11155111") != null);
 
-    const polygon = try Networks.polygon(allocator);
+    var polygon = try Networks.polygon(allocator);
     defer polygon.deinit();
     try std.testing.expect(std.mem.indexOf(u8, polygon.provider.getEndpoint(), "etherspot.io/v2/137") != null);
 
-    const localhost = try Networks.localhost(allocator);
+    var localhost = try Networks.localhost(allocator);
     defer localhost.deinit();
     try std.testing.expectEqualStrings("http://localhost:8545", localhost.provider.getEndpoint());
 }

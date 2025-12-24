@@ -98,19 +98,23 @@ pub fn deriveKey(
 
     // Simple iterative hashing (NOT secure for production)
     // Use PBKDF2 or better in production
-    var current = try allocator.alloc(u8, password.len + salt.len);
+    // Buffer must be at least 32 bytes to hold hash result
+    const buffer_size = @max(password.len + salt.len, 32 + salt.len);
+    var current = try allocator.alloc(u8, buffer_size);
     defer allocator.free(current);
 
     @memcpy(current[0..password.len], password);
-    @memcpy(current[password.len..], salt);
+    @memcpy(current[password.len .. password.len + salt.len], salt);
+    // Zero out any remaining bytes
+    if (buffer_size > password.len + salt.len) {
+        @memset(current[password.len + salt.len ..], 0);
+    }
 
     var i: u32 = 0;
     while (i < iterations) : (i += 1) {
-        const hash_result = keccak.hash(current);
+        const hash_result = keccak.hash(current[0 .. 32 + salt.len]);
         @memcpy(current[0..32], &hash_result.bytes);
-        if (current.len > 32) {
-            @memcpy(current[32..], salt);
-        }
+        @memcpy(current[32 .. 32 + salt.len], salt);
     }
 
     const copy_len = @min(key_len, 32);

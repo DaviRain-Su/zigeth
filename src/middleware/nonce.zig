@@ -36,7 +36,7 @@ pub const NonceMiddleware = struct {
             .strategy = strategy,
             .allocator = allocator,
             .nonce_cache = std.AutoHashMap(Address, u64).init(allocator),
-            .pending_txs = std.AutoHashMap(Address, std.ArrayList(PendingTransaction)).initCapacity(allocator, 0),
+            .pending_txs = std.AutoHashMap(Address, std.ArrayList(PendingTransaction)).init(allocator),
             .last_sync = std.AutoHashMap(Address, i64).init(allocator),
             .sync_interval_seconds = 30, // Sync every 30 seconds for hybrid mode
         };
@@ -49,7 +49,7 @@ pub const NonceMiddleware = struct {
         // Free pending transaction lists
         var pending_it = self.pending_txs.iterator();
         while (pending_it.next()) |entry| {
-            entry.value_ptr.deinit();
+            entry.value_ptr.deinit(self.allocator);
         }
         self.pending_txs.deinit();
 
@@ -128,7 +128,7 @@ pub const NonceMiddleware = struct {
 
         // Get mutable reference to the list
         const list_ptr = self.pending_txs.getPtr(address) orelse return;
-        try list_ptr.append(pending_tx);
+        try list_ptr.append(self.allocator, pending_tx);
     }
 
     /// Get pending transaction count for an address

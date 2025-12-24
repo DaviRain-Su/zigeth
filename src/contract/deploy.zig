@@ -14,7 +14,7 @@ pub const DeployBuilder = struct {
     constructor_args: std.ArrayList(abi.AbiValue),
     constructor_types: []const abi.Parameter,
     from: ?Address,
-    value: ?U256,
+    value: ?u256,
     gas_limit: ?u64,
 
     /// Create a new deployment builder
@@ -36,6 +36,7 @@ pub const DeployBuilder = struct {
 
     pub fn deinit(self: *DeployBuilder) void {
         self.constructor_args.deinit(self.allocator);
+        self.bytecode.deinit();
     }
 
     /// Add a constructor argument
@@ -49,7 +50,7 @@ pub const DeployBuilder = struct {
     }
 
     /// Set value to send (for payable constructors)
-    pub fn setValue(self: *DeployBuilder, value: U256) void {
+    pub fn setValue(self: *DeployBuilder, value: u256) void {
         self.value = value;
     }
 
@@ -59,7 +60,7 @@ pub const DeployBuilder = struct {
     }
 
     /// Build the deployment data (bytecode + encoded constructor args)
-    pub fn buildDeploymentData(self: *DeployBuilder) ![]u8 {
+    pub fn buildDeploymentData(self: *const DeployBuilder) ![]u8 {
         var result = try std.ArrayList(u8).initCapacity(self.allocator, 0);
         defer result.deinit(self.allocator);
 
@@ -68,7 +69,7 @@ pub const DeployBuilder = struct {
 
         // Encode constructor arguments if any
         if (self.constructor_args.items.len > 0) {
-            var encoder = encode.Encoder.init(self.allocator);
+            var encoder = try encode.Encoder.init(self.allocator);
             defer encoder.deinit();
 
             // Encode each argument
@@ -169,7 +170,7 @@ test "deploy builder add arguments" {
     var builder = try DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
     defer builder.deinit();
 
-    try builder.addArg(.{ .uint = U256.fromInt(1000000) });
+    try builder.addArg(.{ .uint = 1000000 });
 
     try std.testing.expectEqual(@as(usize, 1), builder.constructor_args.items.len);
 }
@@ -184,7 +185,7 @@ test "deploy builder set parameters" {
 
     const from = Address.fromBytes([_]u8{0x12} ** 20);
     builder.setFrom(from);
-    builder.setValue(U256.fromInt(500000));
+    builder.setValue(500000);
     builder.setGasLimit(300000);
 
     try std.testing.expect(builder.from != null);

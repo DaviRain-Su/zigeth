@@ -11,7 +11,7 @@ pub const AccessList = struct {
     /// Single entry in an access list
     pub const AccessListEntry = struct {
         address: Address,
-        storage_keys: []Hash,
+        storage_keys: []const Hash,
     };
 
     /// Create an empty access list

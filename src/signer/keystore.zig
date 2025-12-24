@@ -380,7 +380,7 @@ pub const Keystore = struct {
         var salt: [32]u8 = undefined;
         @memcpy(&salt, salt_bytes);
 
-        const kdfparams = switch (kdf) {
+        const kdfparams: KdfParams = switch (kdf) {
             .scrypt => blk: {
                 var params = ScryptParams.default();
                 params.salt = salt;
@@ -531,8 +531,8 @@ test "keystore encrypt and decrypt" {
     defer keystore.deinit();
 
     const decrypted_key = try keystore.decrypt(password);
-    const orig_u256 = try private_key.toU256();
-    const decrypted_u256 = try decrypted_key.toU256();
+    const orig_u256 = private_key.toU256();
+    const decrypted_u256 = decrypted_key.toU256();
 
     try std.testing.expect(orig_u256.eql(decrypted_u256));
 }
@@ -619,8 +619,8 @@ test "keystore json round trip" {
     const decrypted_key = try imported.decrypt(password);
 
     // Verify keys match
-    const orig_u256 = try private_key.toU256();
-    const decrypted_u256 = try decrypted_key.toU256();
+    const orig_u256 = private_key.toU256();
+    const decrypted_u256 = decrypted_key.toU256();
     try std.testing.expect(orig_u256.eql(decrypted_u256));
 }
 

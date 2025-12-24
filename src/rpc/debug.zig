@@ -281,7 +281,7 @@ const JsonObjectWrapper = struct {
     value: std.json.Value,
     allocator: std.mem.Allocator,
 
-    fn deinit(self: JsonObjectWrapper) void {
+    fn deinit(self: *JsonObjectWrapper) void {
         if (self.value == .object) {
             self.value.object.deinit();
         }
@@ -404,7 +404,7 @@ fn parseTraceResult(allocator: std.mem.Allocator, json: std.json.Value) !TraceRe
     }
 
     // Parse struct logs
-    var struct_logs = std.array_list.Managed(StructLog).init(allocator);
+    var struct_logs = try std.ArrayList(StructLog).initCapacity(allocator, 0);
     defer struct_logs.deinit();
 
     if (obj.get("structLogs")) |logs_val| {
@@ -421,7 +421,7 @@ fn parseTraceResult(allocator: std.mem.Allocator, json: std.json.Value) !TraceRe
     return TraceResult{
         .gas = gas,
         .return_value = return_value,
-        .struct_logs = try struct_logs.toOwnedSlice(),
+        .struct_logs = try struct_logs.toOwnedSlice(allocator),
         .allocator = allocator,
     };
 }
@@ -432,15 +432,15 @@ fn parseTraceResults(allocator: std.mem.Allocator, json: std.json.Value) ![]Trac
         return error.InvalidResponse;
     }
 
-    var results = std.array_list.Managed(TraceResult).init(allocator);
-    defer results.deinit();
+    var results = try std.ArrayList(TraceResult).initCapacity(allocator, 0);
+    defer results.deinit(allocator);
 
     for (json.array.items) |item| {
         const trace = try parseTraceResult(allocator, item);
-        try results.append(trace);
+        try results.append(allocator, trace);
     }
 
-    return try results.toOwnedSlice();
+    return try results.toOwnedSlice(allocator);
 }
 
 /// Parse StructLog from JSON
@@ -479,17 +479,17 @@ fn parseStructLog(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Struct
     var stack: ?[]U256 = null;
     if (obj.get("stack")) |stack_val| {
         if (stack_val == .array) {
-            var stack_items = std.array_list.Managed(U256).init(allocator);
-            defer stack_items.deinit();
+            var stack_items = try std.ArrayList(U256).initCapacity(allocator, 0);
+            defer stack_items.deinit(allocator);
 
             for (stack_val.array.items) |item| {
                 if (item == .string) {
                     const value = try U256.fromHex(item.string);
-                    try stack_items.append(value);
+                    try stack_items.append(allocator, value);
                 }
             }
 
-            stack = try stack_items.toOwnedSlice();
+            stack = try stack_items.toOwnedSlice(allocator);
         }
     }
 
@@ -497,19 +497,19 @@ fn parseStructLog(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Struct
     if (obj.get("memory")) |mem_val| {
         if (mem_val == .array) {
             // Memory is returned as array of hex strings
-            var mem_data = std.array_list.Managed(u8).init(allocator);
-            defer mem_data.deinit();
+            var mem_data = try std.ArrayList(u8).initCapacity(allocator, 0);
+            defer mem_data.deinit(allocator);
 
             for (mem_val.array.items) |item| {
                 if (item == .string) {
                     const hex_module = @import("../utils/hex.zig");
                     const bytes = try hex_module.hexToBytes(allocator, item.string);
                     defer allocator.free(bytes);
-                    try mem_data.appendSlice(bytes);
+                    try mem_data.appendSlice(allocator, bytes);
                 }
             }
 
-            memory = try mem_data.toOwnedSlice();
+            memory = try mem_data.toOwnedSlice(allocator);
         }
     }
 
@@ -568,18 +568,18 @@ fn parseStorageRange(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Sto
 
 /// Parse address array from JSON
 fn parseAddressArray(allocator: std.mem.Allocator, array: std.json.Array) ![]Address {
-    var addresses = std.array_list.Managed(Address).init(allocator);
-    defer addresses.deinit();
+    var addresses = try std.ArrayList(Address).initCapacity(allocator, 0);
+    defer addresses.deinit(allocator);
 
     for (array.items) |item| {
         if (item != .string) {
             return error.InvalidFieldType;
         }
         const addr = try Address.fromHex(item.string);
-        try addresses.append(addr);
+        try addresses.append(allocator, addr);
     }
 
-    return try addresses.toOwnedSlice();
+    return try addresses.toOwnedSlice(allocator);
 }
 
 test "debug namespace creation" {
@@ -607,7 +607,7 @@ test "trace options to json" {
         .timeout = "5s",
     };
 
-    const json_obj = try traceOptionsToJson(allocator, options);
+    var json_obj = try traceOptionsToJson(allocator, options);
     defer json_obj.deinit();
 
     try std.testing.expect(json_obj.value == .object);
