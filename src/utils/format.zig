@@ -1,7 +1,6 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
 
 /// Format an address for display (shortened format)
 /// Example: 0x1234...5678
@@ -72,14 +71,14 @@ pub fn formatBytes(allocator: std.mem.Allocator, bytes: []const u8, max_length: 
     return try allocator.dupe(u8, hex);
 }
 
-/// Format a U256 as a decimal string
-pub fn formatU256(allocator: std.mem.Allocator, value: U256) ![]u8 {
+/// Format a native u256 as a decimal string
+pub fn formatU256Native(allocator: std.mem.Allocator, value: u256) ![]u8 {
     // Convert to decimal string
     var result = try std.ArrayList(u8).initCapacity(allocator, 0);
     defer result.deinit(allocator);
 
     // Handle zero case
-    if (value.isZero()) {
+    if (value == 0) {
         try result.append(allocator, '0');
         return try result.toOwnedSlice(allocator);
     }
@@ -89,11 +88,10 @@ pub fn formatU256(allocator: std.mem.Allocator, value: U256) ![]u8 {
     var digits = try std.ArrayList(u8).initCapacity(allocator, 0);
     defer digits.deinit(allocator);
 
-    while (!temp.isZero()) {
-        const div_result = temp.divScalar(10);
-        const digit = @as(u8, @intCast(div_result.remainder));
+    while (temp > 0) {
+        const digit = @as(u8, @intCast(temp % 10));
         try digits.append(allocator, '0' + digit);
-        temp = div_result.quotient;
+        temp = temp / 10;
     }
 
     // Reverse digits
@@ -106,9 +104,10 @@ pub fn formatU256(allocator: std.mem.Allocator, value: U256) ![]u8 {
     return try result.toOwnedSlice(allocator);
 }
 
-/// Format a U256 as a hex string with 0x prefix
-pub fn formatU256Hex(allocator: std.mem.Allocator, value: U256) ![]u8 {
-    return try value.toHex(allocator);
+/// Format a native u256 as a hex string with 0x prefix
+pub fn formatU256Hex(allocator: std.mem.Allocator, value: u256) ![]u8 {
+    const u256ToHex = @import("../primitives/uint.zig").u256ToHex;
+    return try u256ToHex(allocator, value);
 }
 
 /// Format a number with thousand separators
@@ -206,21 +205,21 @@ test "format bytes with limit" {
     try std.testing.expect(formatted.len <= 10);
 }
 
-test "format U256 decimal" {
+test "format u256 decimal" {
     const allocator = std.testing.allocator;
 
-    const value = U256.fromInt(1234567890);
-    const formatted = try formatU256(allocator, value);
+    const value: u256 = 1234567890;
+    const formatted = try formatU256Native(allocator, value);
     defer allocator.free(formatted);
 
     try std.testing.expectEqualStrings("1234567890", formatted);
 }
 
-test "format U256 zero" {
+test "format u256 zero" {
     const allocator = std.testing.allocator;
 
-    const value = U256.zero();
-    const formatted = try formatU256(allocator, value);
+    const value: u256 = 0;
+    const formatted = try formatU256Native(allocator, value);
     defer allocator.free(formatted);
 
     try std.testing.expectEqualStrings("0", formatted);

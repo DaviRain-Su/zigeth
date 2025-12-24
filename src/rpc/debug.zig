@@ -3,7 +3,7 @@ const RpcClient = @import("./client.zig").RpcClient;
 const types = @import("./types.zig");
 const Hash = @import("../primitives/hash.zig").Hash;
 const Address = @import("../primitives/address.zig").Address;
-const U256 = @import("../primitives/uint.zig").U256;
+const u256FromHex = @import("../primitives/uint.zig").u256FromHex;
 
 /// Debug namespace (debug_*) methods
 /// These methods are typically only available on development nodes
@@ -233,7 +233,7 @@ pub const StructLog = struct {
     gas: u64,
     gas_cost: u64,
     depth: u64,
-    stack: ?[]U256 = null,
+    stack: ?[]u256 = null,
     memory: ?[]const u8 = null,
     storage: ?std.StringHashMap(Hash) = null,
     allocator: std.mem.Allocator,
@@ -476,15 +476,15 @@ fn parseStructLog(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Struct
         return error.InvalidFieldType;
 
     // Optional fields
-    var stack: ?[]U256 = null;
+    var stack: ?[]u256 = null;
     if (obj.get("stack")) |stack_val| {
         if (stack_val == .array) {
-            var stack_items = try std.ArrayList(U256).initCapacity(allocator, 0);
+            var stack_items = try std.ArrayList(u256).initCapacity(allocator, 0);
             defer stack_items.deinit(allocator);
 
             for (stack_val.array.items) |item| {
                 if (item == .string) {
-                    const value = try U256.fromHex(item.string);
+                    const value = try u256FromHex(item.string);
                     try stack_items.append(allocator, value);
                 }
             }

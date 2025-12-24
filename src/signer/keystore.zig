@@ -534,7 +534,7 @@ test "keystore encrypt and decrypt" {
     const orig_u256 = private_key.toU256();
     const decrypted_u256 = decrypted_key.toU256();
 
-    try std.testing.expect(orig_u256.eql(decrypted_u256));
+    try std.testing.expectEqual(orig_u256, decrypted_u256);
 }
 
 test "keystore wrong password" {
@@ -621,7 +621,7 @@ test "keystore json round trip" {
     // Verify keys match
     const orig_u256 = private_key.toU256();
     const decrypted_u256 = decrypted_key.toU256();
-    try std.testing.expect(orig_u256.eql(decrypted_u256));
+    try std.testing.expectEqual(orig_u256, decrypted_u256);
 }
 
 test "keystore aes encryption" {

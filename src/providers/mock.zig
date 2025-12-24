@@ -1,7 +1,6 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
 const Block = @import("../types/block.zig").Block;
 const Transaction = @import("../types/transaction.zig").Transaction;
 const Receipt = @import("../types/receipt.zig").Receipt;
@@ -11,10 +10,10 @@ pub const MockProvider = struct {
     allocator: std.mem.Allocator,
     chain_id: u64,
     block_number: u64,
-    balances: std.AutoHashMap(Address, U256),
+    balances: std.AutoHashMap(Address, u256),
     transactions: std.AutoHashMap(Hash, Transaction),
     receipts: std.AutoHashMap(Hash, Receipt),
-    gas_price: U256,
+    gas_price: u256,
 
     /// Create a new mock provider
     pub fn init(allocator: std.mem.Allocator) MockProvider {
@@ -22,10 +21,10 @@ pub const MockProvider = struct {
             .allocator = allocator,
             .chain_id = 1,
             .block_number = 1000000,
-            .balances = std.AutoHashMap(Address, U256).init(allocator),
+            .balances = std.AutoHashMap(Address, u256).init(allocator),
             .transactions = std.AutoHashMap(Hash, Transaction).init(allocator),
             .receipts = std.AutoHashMap(Hash, Receipt).init(allocator),
-            .gas_price = U256.fromInt(30_000_000_000), // 30 gwei
+            .gas_price = 30_000_000_000, // 30 gwei
         };
     }
 
@@ -57,7 +56,7 @@ pub const MockProvider = struct {
     }
 
     /// Set balance for an address
-    pub fn setBalance(self: *MockProvider, address: Address, balance: U256) !void {
+    pub fn setBalance(self: *MockProvider, address: Address, balance: u256) !void {
         try self.balances.put(address, balance);
     }
 
@@ -72,7 +71,7 @@ pub const MockProvider = struct {
     }
 
     /// Set gas price
-    pub fn setGasPrice(self: *MockProvider, gas_price: U256) void {
+    pub fn setGasPrice(self: *MockProvider, gas_price: u256) void {
         self.gas_price = gas_price;
     }
 
@@ -85,8 +84,8 @@ pub const MockProvider = struct {
         return self.block_number;
     }
 
-    pub fn getBalance(self: MockProvider, address: Address) !U256 {
-        return self.balances.get(address) orelse U256.zero();
+    pub fn getBalance(self: MockProvider, address: Address) !u256 {
+        return self.balances.get(address) orelse 0;
     }
 
     pub fn getTransaction(self: MockProvider, hash: Hash) !Transaction {
@@ -97,7 +96,7 @@ pub const MockProvider = struct {
         return self.receipts.get(hash) orelse error.ReceiptNotFound;
     }
 
-    pub fn getGasPrice(self: MockProvider) !U256 {
+    pub fn getGasPrice(self: MockProvider) !u256 {
         return self.gas_price;
     }
 
@@ -113,7 +112,7 @@ pub const MockProvider = struct {
         self.receipts.clearAndFree();
         self.block_number = 1000000;
         self.chain_id = 1;
-        self.gas_price = U256.fromInt(30_000_000_000);
+        self.gas_price = 30_000_000_000;
     }
 };
 
@@ -137,12 +136,12 @@ test "mock provider set balance" {
     defer provider.deinit();
 
     const addr = Address.fromBytes([_]u8{0x12} ** 20);
-    const balance = U256.fromInt(1_000_000_000_000_000_000); // 1 ETH
+    const balance: u256 = 1_000_000_000_000_000_000; // 1 ETH
 
     try provider.setBalance(addr, balance);
 
     const retrieved = try provider.getBalance(addr);
-    try std.testing.expect(retrieved.eql(balance));
+    try std.testing.expectEqual(balance, retrieved);
 }
 
 test "mock provider mine block" {
@@ -164,11 +163,11 @@ test "mock provider gas price" {
     var provider = MockProvider.init(allocator);
     defer provider.deinit();
 
-    const custom_price = U256.fromInt(50_000_000_000); // 50 gwei
+    const custom_price: u256 = 50_000_000_000; // 50 gwei
     provider.setGasPrice(custom_price);
 
     const price = try provider.getGasPrice();
-    try std.testing.expect(price.eql(custom_price));
+    try std.testing.expectEqual(custom_price, price);
 }
 
 test "mock provider reset" {
@@ -179,7 +178,7 @@ test "mock provider reset" {
 
     // Set some state
     const addr = Address.fromBytes([_]u8{0x12} ** 20);
-    try provider.setBalance(addr, U256.fromInt(1000));
+    try provider.setBalance(addr, 1000);
     provider.setBlockNumber(2000000);
 
     // Reset
@@ -190,5 +189,5 @@ test "mock provider reset" {
     try std.testing.expectEqual(@as(u64, 1000000), block_num);
 
     const balance = try provider.getBalance(addr);
-    try std.testing.expect(balance.isZero());
+    try std.testing.expectEqual(@as(u256, 0), balance);
 }

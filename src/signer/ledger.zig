@@ -194,8 +194,8 @@ pub const LedgerWallet = struct {
         _ = hash;
 
         return Signature.init(
-            @import("../primitives/uint.zig").U256.zero(),
-            @import("../primitives/uint.zig").U256.zero(),
+            [_]u8{0} ** 32,
+            [_]u8{0} ** 32,
             0,
         );
     }
@@ -212,8 +212,8 @@ pub const LedgerWallet = struct {
         _ = chain_id;
 
         return Signature.init(
-            @import("../primitives/uint.zig").U256.zero(),
-            @import("../primitives/uint.zig").U256.zero(),
+            [_]u8{0} ** 32,
+            [_]u8{0} ** 32,
             0,
         );
     }
@@ -229,8 +229,8 @@ pub const LedgerWallet = struct {
         _ = message;
 
         return Signature.init(
-            @import("../primitives/uint.zig").U256.zero(),
-            @import("../primitives/uint.zig").U256.zero(),
+            [_]u8{0} ** 32,
+            [_]u8{0} ** 32,
             0,
         );
     }
@@ -250,8 +250,8 @@ pub const LedgerWallet = struct {
         _ = message_hash;
 
         return Signature.init(
-            @import("../primitives/uint.zig").U256.zero(),
-            @import("../primitives/uint.zig").U256.zero(),
+            [_]u8{0} ** 32,
+            [_]u8{0} ** 32,
             0,
         );
     }

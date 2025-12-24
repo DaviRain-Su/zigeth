@@ -2,30 +2,32 @@ const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
 const Signature = @import("../primitives/signature.zig").Signature;
-const U256 = @import("../primitives/uint.zig").U256;
+const uint_utils = @import("../primitives/uint.zig");
+const u256FromBytes = uint_utils.u256FromBytes;
+const u256ToBytes = uint_utils.u256ToBytes;
 const keccak = @import("./keccak.zig");
 const secp = @import("secp256k1");
 
 /// secp256k1 curve parameters
 pub const Secp256k1 = struct {
     /// Field prime (p)
-    pub const P = U256.fromBytes([_]u8{
+    pub const P: u256 = u256FromBytes([_]u8{
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF, 0xFC, 0x2F,
     });
 
     /// Curve order (n)
-    pub const N = U256.fromBytes([_]u8{
+    pub const N: u256 = u256FromBytes([_]u8{
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE,
         0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41,
     });
 
     /// Generator point G
-    pub const G_X = U256.fromBytes([_]u8{
+    pub const G_X: u256 = u256FromBytes([_]u8{
         0x79, 0xBE, 0x66, 0x7E, 0xF9, 0xDC, 0xBB, 0xAC, 0x55, 0xA0, 0x62, 0x95, 0xCE, 0x87, 0x0B, 0x07,
         0x02, 0x9B, 0xFC, 0xDB, 0x2D, 0xCE, 0x28, 0xD9, 0x59, 0xF2, 0x81, 0x5B, 0x16, 0xF8, 0x17, 0x98,
     });
-    pub const G_Y = U256.fromBytes([_]u8{
+    pub const G_Y: u256 = u256FromBytes([_]u8{
         0x48, 0x3A, 0xDA, 0x77, 0x26, 0xA3, 0xC4, 0x65, 0x5D, 0xA4, 0xFB, 0xFC, 0x0E, 0x11, 0x08, 0xA8,
         0xFD, 0x17, 0xB4, 0x48, 0xA6, 0x85, 0x54, 0x19, 0x9C, 0x47, 0xD0, 0x8F, 0xFB, 0x10, 0xD4, 0xB8,
     });
@@ -38,19 +40,19 @@ pub const PrivateKey = struct {
     /// Create from bytes
     pub fn fromBytes(bytes: [32]u8) !PrivateKey {
         // Verify the key is in valid range (0 < key < N)
-        const key_value = U256.fromBytes(bytes);
-        if (key_value.isZero() or key_value.gte(Secp256k1.N)) {
+        const key_value = u256FromBytes(bytes);
+        if (key_value == 0 or key_value >= Secp256k1.N) {
             return error.InvalidPrivateKey;
         }
         return .{ .bytes = bytes };
     }
 
-    /// Create from U256
-    pub fn fromU256(value: U256) !PrivateKey {
-        if (value.isZero() or value.gte(Secp256k1.N)) {
+    /// Create from u256
+    pub fn fromU256(value: u256) !PrivateKey {
+        if (value == 0 or value >= Secp256k1.N) {
             return error.InvalidPrivateKey;
         }
-        return .{ .bytes = value.toBytes() };
+        return .{ .bytes = u256ToBytes(value) };
     }
 
     /// Generate a random private key
@@ -59,8 +61,8 @@ pub const PrivateKey = struct {
         random.bytes(&bytes);
 
         // Ensure the key is valid
-        const key_value = U256.fromBytes(bytes);
-        if (key_value.isZero() or key_value.gte(Secp256k1.N)) {
+        const key_value = u256FromBytes(bytes);
+        if (key_value == 0 or key_value >= Secp256k1.N) {
             // Try again recursively (very unlikely to fail twice)
             return try generate(random);
         }
@@ -68,9 +70,9 @@ pub const PrivateKey = struct {
         return .{ .bytes = bytes };
     }
 
-    /// Convert to U256
-    pub fn toU256(self: PrivateKey) U256 {
-        return U256.fromBytes(self.bytes);
+    /// Convert to u256
+    pub fn toU256(self: PrivateKey) u256 {
+        return u256FromBytes(self.bytes);
     }
 };
 
@@ -118,8 +120,8 @@ pub const PublicKey = struct {
         const result = try allocator.alloc(u8, 33);
 
         // Prefix byte: 0x02 if y is even, 0x03 if y is odd
-        const y_value = U256.fromBytes(self.y);
-        result[0] = if (y_value.toU64() & 1 == 0) 0x02 else 0x03;
+        const y_value = u256FromBytes(self.y);
+        result[0] = if (y_value & 1 == 0) 0x02 else 0x03;
 
         @memcpy(result[1..33], &self.x);
         return result;
@@ -202,7 +204,7 @@ test "private key validation" {
     // Valid private key
     const valid_bytes = [_]u8{1} ** 32;
     const pk = try PrivateKey.fromBytes(valid_bytes);
-    try std.testing.expect(!pk.toU256().isZero());
+    try std.testing.expect(pk.toU256() != 0);
 
     // Zero private key is invalid
     const zero_bytes = [_]u8{0} ** 32;
@@ -215,7 +217,7 @@ test "private key generation" {
     const random = prng.random();
 
     const pk = try PrivateKey.generate(random);
-    try std.testing.expect(!pk.toU256().isZero());
+    try std.testing.expect(pk.toU256() != 0);
 }
 
 test "public key uncompressed format" {

@@ -1,7 +1,7 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
+const u256FromBytes = @import("../primitives/uint.zig").u256FromBytes;
 const Bytes = @import("../primitives/bytes.zig").Bytes;
 const Log = @import("../types/log.zig").Log;
 const abi = @import("../abi/types.zig");
@@ -141,7 +141,7 @@ pub fn parseEvent(
                     break :blk abi.AbiValue{ .address = Address.fromBytes(addr_bytes) };
                 },
                 .uint256, .uint128, .uint64, .uint32, .uint16, .uint8 => blk: {
-                    break :blk abi.AbiValue{ .uint = U256.fromBytes(topic.bytes) };
+                    break :blk abi.AbiValue{ .uint = u256FromBytes(topic.bytes) };
                 },
                 .bool_type => blk: {
                     break :blk abi.AbiValue{ .bool_val = topic.bytes[31] != 0 };

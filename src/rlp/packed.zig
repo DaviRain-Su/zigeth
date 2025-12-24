@@ -3,8 +3,9 @@ const encode = @import("./encode.zig");
 const decode = @import("./decode.zig");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256; // Legacy compatibility
 const uint_utils = @import("../primitives/uint.zig");
+const u256ToBytes = uint_utils.u256ToBytes;
+const u256FromBytes = uint_utils.u256FromBytes;
 const Signature = @import("../primitives/signature.zig").Signature;
 const Transaction = @import("../types/transaction.zig").Transaction;
 const TransactionType = @import("../types/transaction.zig").TransactionType;
@@ -121,9 +122,9 @@ pub const EthereumEncoder = struct {
         return try encode.encodeBytes(allocator, &hash.bytes);
     }
 
-    /// Encode a U256
-    pub fn encodeU256(allocator: std.mem.Allocator, value: U256) ![]u8 {
-        const bytes = value.toBytes();
+    /// Encode a u256
+    pub fn encodeU256(allocator: std.mem.Allocator, value: u256) ![]u8 {
+        const bytes = u256ToBytes(value);
 
         // Find first non-zero byte
         var start: usize = 0;
@@ -190,10 +191,10 @@ pub const EthereumDecoder = struct {
         return Hash.fromBytes(bytes);
     }
 
-    /// Decode a U256 from RLP bytes
-    pub fn decodeU256(data: []const u8) !U256 {
+    /// Decode a u256 from RLP bytes
+    pub fn decodeU256(data: []const u8) !u256 {
         if (data.len == 0) {
-            return U256.zero();
+            return 0;
         }
         if (data.len > 32) {
             return error.ValueTooLarge;
@@ -204,7 +205,7 @@ pub const EthereumDecoder = struct {
         const offset = 32 - data.len;
         @memcpy(bytes[offset..], data);
 
-        return U256.fromBytes(bytes);
+        return u256FromBytes(bytes);
     }
 };
 
@@ -232,10 +233,10 @@ test "encode hash" {
     try std.testing.expectEqual(@as(u8, 0x80 + 32), encoded[0]);
 }
 
-test "encode U256 zero" {
+test "encode u256 zero" {
     const allocator = std.testing.allocator;
 
-    const value = U256.zero();
+    const value: u256 = 0;
     const encoded = try EthereumEncoder.encodeU256(allocator, value);
     defer allocator.free(encoded);
 
@@ -243,10 +244,10 @@ test "encode U256 zero" {
     try std.testing.expectEqualSlices(u8, &[_]u8{0x80}, encoded);
 }
 
-test "encode U256 small" {
+test "encode u256 small" {
     const allocator = std.testing.allocator;
 
-    const value = U256.fromInt(42);
+    const value: u256 = 42;
     const encoded = try EthereumEncoder.encodeU256(allocator, value);
     defer allocator.free(encoded);
 
@@ -268,14 +269,14 @@ test "decode hash" {
     try std.testing.expectEqual(Hash.fromBytes(hash_bytes), hash);
 }
 
-test "decode U256 zero" {
+test "decode u256 zero" {
     const value = try EthereumDecoder.decodeU256(&[_]u8{});
-    try std.testing.expect(value.isZero());
+    try std.testing.expectEqual(@as(u256, 0), value);
 }
 
-test "decode U256 small" {
+test "decode u256 small" {
     const value = try EthereumDecoder.decodeU256(&[_]u8{0x2a});
-    try std.testing.expect(value.eql(U256.fromInt(42)));
+    try std.testing.expectEqual(@as(u256, 42), value);
 }
 
 test "encode address list" {
@@ -308,10 +309,10 @@ test "encode hash list" {
     try std.testing.expect(encoded.len > 64);
 }
 
-test "roundtrip U256 encoding" {
+test "roundtrip u256 encoding" {
     const allocator = std.testing.allocator;
 
-    const original = U256.fromInt(0x123456);
+    const original: u256 = 0x123456;
     const encoded = try EthereumEncoder.encodeU256(allocator, original);
     defer allocator.free(encoded);
 
@@ -322,5 +323,5 @@ test "roundtrip U256 encoding" {
     const bytes = try rlp_value.getBytes();
     const decoded = try EthereumDecoder.decodeU256(bytes);
 
-    try std.testing.expect(decoded.eql(original));
+    try std.testing.expectEqual(original, decoded);
 }

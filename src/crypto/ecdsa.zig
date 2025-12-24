@@ -149,7 +149,7 @@ test "signer creation" {
     const signer = Signer.init(pk);
 
     // Verify signer was created
-    try std.testing.expect(!signer.private_key.toU256().isZero());
+    try std.testing.expect(signer.private_key.toU256() != 0);
 }
 
 test "transaction signer with chain id" {

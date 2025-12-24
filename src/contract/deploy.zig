@@ -1,7 +1,6 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
 const Bytes = @import("../primitives/bytes.zig").Bytes;
 const Transaction = @import("../types/transaction.zig").Transaction;
 const abi = @import("../abi/types.zig");

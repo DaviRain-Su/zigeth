@@ -117,7 +117,7 @@ pub const Wallet = struct {
         var encoder = RlpEncoder.init(self.allocator);
         defer encoder.deinit();
 
-        switch (tx.transaction_type) {
+        switch (tx.type) {
             .legacy => {
                 // Legacy transaction with EIP-155
                 try encoder.startList();
@@ -150,7 +150,7 @@ pub const Wallet = struct {
                 try encoder.appendItem(.{ .uint = chain_id });
                 try encoder.appendItem(.{ .uint = tx.nonce });
 
-                switch (tx.transaction_type) {
+                switch (tx.type) {
                     .eip2930 => {
                         try encoder.appendItem(.{ .uint = u256ToU64(tx.gas_price orelse 0) catch 0 });
                     },
@@ -176,13 +176,13 @@ pub const Wallet = struct {
                 try encoder.appendItem(.{ .list = &[_]RlpItem{} });
 
                 // EIP-4844 specific
-                if (tx.transaction_type == .eip4844) {
+                if (tx.type == .eip4844) {
                     try encoder.appendItem(.{ .uint = 0 }); // max_fee_per_blob_gas (TODO)
                     try encoder.appendItem(.{ .list = &[_]RlpItem{} }); // blob versioned hashes
                 }
 
                 // EIP-7702 specific
-                if (tx.transaction_type == .eip7702) {
+                if (tx.type == .eip7702) {
                     try encoder.appendItem(.{ .list = &[_]RlpItem{} }); // authorization list
                 }
 
@@ -190,7 +190,7 @@ pub const Wallet = struct {
                 defer self.allocator.free(encoded);
 
                 // Prepend transaction type
-                const tx_type: u8 = switch (tx.transaction_type) {
+                const tx_type: u8 = switch (tx.type) {
                     .eip2930 => 0x01,
                     .eip1559 => 0x02,
                     .eip4844 => 0x03,
