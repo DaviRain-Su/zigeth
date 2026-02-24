@@ -332,7 +332,7 @@ pub const EthNamespace = struct {
             return error.InvalidResponse;
         }
 
-        var logs = std.ArrayList(Log).init(self.client.allocator);
+        var logs = try std.ArrayList(Log).initCapacity(self.client.allocator, 0);
         errdefer {
             for (logs.items) |log| {
                 log.deinit();
@@ -346,10 +346,10 @@ pub const EthNamespace = struct {
             }
 
             const log = try parseLogFromJson(self.client.allocator, log_json.object);
-            try logs.append(log);
+            try logs.append(self.client.allocator, log);
         }
 
-        return try logs.toOwnedSlice();
+        return try logs.toOwnedSlice(self.client.allocator);
     }
 
     /// eth_sendRawTransaction - Sends a signed transaction
@@ -498,18 +498,18 @@ pub const EthNamespace = struct {
             return error.InvalidResponse;
         }
 
-        var addresses = std.ArrayList(Address).init(self.client.allocator);
-        errdefer addresses.deinit();
+        var addresses = try std.ArrayList(Address).initCapacity(self.client.allocator, 0);
+        errdefer addresses.deinit(self.client.allocator);
 
         for (result.array.items) |item| {
             if (item != .string) {
                 return error.InvalidResponse;
             }
             const addr = try Address.fromHex(item.string);
-            try addresses.append(addr);
+            try addresses.append(self.client.allocator, addr);
         }
 
-        return try addresses.toOwnedSlice();
+        return try addresses.toOwnedSlice(self.client.allocator);
     }
 
     /// eth_sign - Signs data with an address
@@ -583,8 +583,15 @@ const JsonObjectWrapper = struct {
     value: std.json.Value,
     allocator: std.mem.Allocator,
 
-    fn deinit(self: JsonObjectWrapper) void {
+    fn deinit(self: *JsonObjectWrapper) void {
         if (self.value == .object) {
+            // Free all string values that were allocated
+            var iter = self.value.object.iterator();
+            while (iter.next()) |entry| {
+                if (entry.value_ptr.* == .string) {
+                    self.allocator.free(entry.value_ptr.string);
+                }
+            }
             self.value.object.deinit();
         }
     }
@@ -613,7 +620,7 @@ fn callParamsToJson(allocator: std.mem.Allocator, params: types.CallParams) !Jso
     }
 
     if (params.value) |value| {
-        const value_hex = try value.toHex(allocator);
+        const value_hex = try uint_utils.u256ToHex(value, allocator);
         try obj.put("value", .{ .string = value_hex });
     }
 
@@ -623,7 +630,7 @@ fn callParamsToJson(allocator: std.mem.Allocator, params: types.CallParams) !Jso
     }
 
     if (params.gas_price) |gas_price| {
-        const gp_hex = try gas_price.toHex(allocator);
+        const gp_hex = try uint_utils.u256ToHex(gas_price, allocator);
         try obj.put("gasPrice", .{ .string = gp_hex });
     }
 
@@ -652,7 +659,7 @@ fn transactionParamsToJson(allocator: std.mem.Allocator, params: types.Transacti
     }
 
     if (params.value) |value| {
-        const value_hex = try value.toHex(allocator);
+        const value_hex = try uint_utils.u256ToHex(value, allocator);
         try obj.put("value", .{ .string = value_hex });
     }
 
@@ -662,7 +669,7 @@ fn transactionParamsToJson(allocator: std.mem.Allocator, params: types.Transacti
     }
 
     if (params.gas_price) |gas_price| {
-        const gp_hex = try gas_price.toHex(allocator);
+        const gp_hex = try uint_utils.u256ToHex(gas_price, allocator);
         try obj.put("gasPrice", .{ .string = gp_hex });
     }
 
@@ -739,13 +746,13 @@ fn parseLogFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !Log 
     const topics_json = obj.get("topics") orelse return error.MissingField;
     if (topics_json != .array) return error.InvalidFieldType;
 
-    var topics = std.ArrayList(Hash).init(allocator);
-    defer topics.deinit();
+    var topics = try std.ArrayList(Hash).initCapacity(allocator, 0);
+    defer topics.deinit(allocator);
 
     for (topics_json.array.items) |topic_val| {
         if (topic_val != .string) return error.InvalidFieldType;
         const topic = try Hash.fromHex(topic_val.string);
-        try topics.append(topic);
+        try topics.append(allocator, topic);
     }
 
     // Create log with required fields
@@ -859,6 +866,32 @@ fn parseTransactionFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMa
         }
     }
 
+    // Parse EIP-4844 specific fields
+    var max_fee_per_blob_gas: ?u256 = null;
+    var blob_versioned_hashes: ?[]Hash = null;
+
+    if (tx_type == .eip4844) {
+        if (obj.get("maxFeePerBlobGas")) |blob_fee| {
+            if (blob_fee == .string) {
+                max_fee_per_blob_gas = try uint_utils.u256FromHex(blob_fee.string);
+            }
+        }
+        if (obj.get("blobVersionedHashes")) |hashes_val| {
+            if (hashes_val == .array) {
+                const hashes_array = hashes_val.array;
+                if (hashes_array.items.len > 0) {
+                    var hashes = try allocator.alloc(Hash, hashes_array.items.len);
+                    for (hashes_array.items, 0..) |hash_val, i| {
+                        if (hash_val == .string) {
+                            hashes[i] = try Hash.fromHex(hash_val.string);
+                        }
+                    }
+                    blob_versioned_hashes = hashes;
+                }
+            }
+        }
+    }
+
     // Create base transaction
     var tx = Transaction{
         .type = tx_type,
@@ -874,6 +907,8 @@ fn parseTransactionFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMa
         .chain_id = null,
         .access_list = null,
         .authorization_list = null,
+        .max_fee_per_blob_gas = max_fee_per_blob_gas,
+        .blob_versioned_hashes = blob_versioned_hashes,
         .signature = null,
         .hash = null,
         .block_hash = null,
@@ -986,13 +1021,13 @@ fn parseReceiptFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !
     const logs_json = obj.get("logs") orelse return error.MissingField;
     if (logs_json != .array) return error.InvalidFieldType;
 
-    var logs = std.ArrayList(Log).init(allocator);
-    defer logs.deinit();
+    var logs = try std.ArrayList(Log).initCapacity(allocator, 0);
+    defer logs.deinit(allocator);
 
     for (logs_json.array.items) |log_json| {
         if (log_json != .object) return error.InvalidFieldType;
         const log = try parseLogFromJson(allocator, log_json.object);
-        try logs.append(log);
+        try logs.append(allocator, log);
     }
 
     const logs_bloom_str = obj.get("logsBloom") orelse return error.MissingField;
@@ -1039,7 +1074,7 @@ fn parseReceiptFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !
         .gas_used = gas_used,
         .effective_gas_price = effective_gas_price,
         .contract_address = contract_address,
-        .logs = try logs.toOwnedSlice(),
+        .logs = try logs.toOwnedSlice(allocator),
         .logs_bloom = logs_bloom,
         .transaction_type = transaction_type,
         .status = status,
@@ -1186,15 +1221,15 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
     const transactions_json = obj.get("transactions") orelse return error.MissingField;
     if (transactions_json != .array) return error.InvalidFieldType;
 
-    var transactions = std.ArrayList(Transaction).init(allocator);
-    defer transactions.deinit();
+    var transactions = try std.ArrayList(Transaction).initCapacity(allocator, 0);
+    defer transactions.deinit(allocator);
 
     if (full_tx) {
         // Full transaction objects
         for (transactions_json.array.items) |tx_json| {
             if (tx_json != .object) return error.InvalidFieldType;
             const tx = try parseTransactionFromJson(allocator, tx_json.object);
-            try transactions.append(tx);
+            try transactions.append(allocator, tx);
         }
     } else {
         // Just transaction hashes - create minimal transaction structs
@@ -1218,6 +1253,8 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
                 .chain_id = null,
                 .access_list = null,
                 .authorization_list = null,
+                .max_fee_per_blob_gas = null,
+                .blob_versioned_hashes = null,
                 .signature = null,
                 .hash = tx_hash,
                 .block_hash = null,
@@ -1225,7 +1262,7 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
                 .transaction_index = null,
                 .allocator = allocator,
             };
-            try transactions.append(tx);
+            try transactions.append(allocator, tx);
         }
     }
 
@@ -1236,7 +1273,7 @@ fn parseBlockFromJson(allocator: std.mem.Allocator, obj: std.json.ObjectMap, ful
     return Block{
         .hash = hash,
         .header = header,
-        .transactions = try transactions.toOwnedSlice(),
+        .transactions = try transactions.toOwnedSlice(allocator),
         .uncles = &[_]Hash{}, // TODO: Parse uncles from JSON
         .total_difficulty = 0, // TODO: Parse total difficulty
         .size = 0, // TODO: Parse size from JSON
@@ -1257,7 +1294,7 @@ test "eth namespace creation" {
 test "block parameter to string" {
     const allocator = std.testing.allocator;
 
-    const latest = try blockParameterToString(allocator, .latest);
+    const latest = try blockParameterToString(allocator, .{ .tag = .latest });
     defer allocator.free(latest);
     try std.testing.expectEqualStrings("latest", latest);
 
@@ -1290,7 +1327,7 @@ test "call params to json" {
         .gas_price = null,
     };
 
-    const json_obj = try callParamsToJson(allocator, params);
+    var json_obj = try callParamsToJson(allocator, params);
     defer json_obj.deinit();
 
     try std.testing.expect(json_obj.value == .object);

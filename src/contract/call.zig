@@ -1,7 +1,6 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
 const Bytes = @import("../primitives/bytes.zig").Bytes;
 const abi = @import("../abi/types.zig");
 const Contract = @import("./contract.zig").Contract;
@@ -13,15 +12,15 @@ pub const CallBuilder = struct {
     function: abi.Function,
     args: std.ArrayList(abi.AbiValue),
     from: ?Address,
-    value: ?U256,
+    value: ?u256,
     gas_limit: ?u64,
 
-    pub fn init(allocator: std.mem.Allocator, contract: *const Contract, function: abi.Function) CallBuilder {
+    pub fn init(allocator: std.mem.Allocator, contract: *const Contract, function: abi.Function) !CallBuilder {
         return .{
             .allocator = allocator,
             .contract = contract,
             .function = function,
-            .args = std.ArrayList(abi.AbiValue).init(allocator),
+            .args = try std.ArrayList(abi.AbiValue).initCapacity(allocator, 0),
             .from = null,
             .value = null,
             .gas_limit = null,
@@ -29,12 +28,12 @@ pub const CallBuilder = struct {
     }
 
     pub fn deinit(self: *CallBuilder) void {
-        self.args.deinit();
+        self.args.deinit(self.allocator);
     }
 
     /// Add an argument
     pub fn addArg(self: *CallBuilder, arg: abi.AbiValue) !void {
-        try self.args.append(arg);
+        try self.args.append(self.allocator, arg);
     }
 
     /// Set sender address
@@ -43,7 +42,7 @@ pub const CallBuilder = struct {
     }
 
     /// Set value to send (for payable functions)
-    pub fn setValue(self: *CallBuilder, value: U256) void {
+    pub fn setValue(self: *CallBuilder, value: u256) void {
         self.value = value;
     }
 
@@ -73,7 +72,7 @@ pub const CallParams = struct {
     from: ?Address,
     to: Address,
     data: []const u8,
-    value: ?U256,
+    value: ?u256,
     gas_limit: ?u64,
 
     pub fn init(to: Address, data: []const u8) CallParams {
@@ -144,7 +143,7 @@ pub fn callMutating(
     function: abi.Function,
     args: []const abi.AbiValue,
     from: Address,
-    value: ?U256,
+    value: ?u256,
     gas_limit: ?u64,
 ) !Hash {
     _ = contract; // Will be used in future RPC implementation
@@ -190,7 +189,7 @@ test "call builder creation" {
     const contract = try Contract.init(allocator, addr, &[_]abi.Function{func}, &[_]abi.Event{});
     defer contract.deinit();
 
-    var builder = CallBuilder.init(allocator, &contract, func);
+    var builder = try CallBuilder.init(allocator, &contract, func);
     defer builder.deinit();
 
     try std.testing.expectEqual(addr, builder.getTo());
@@ -213,12 +212,12 @@ test "call builder add arguments" {
     const contract = try Contract.init(allocator, addr, &[_]abi.Function{}, &[_]abi.Event{});
     defer contract.deinit();
 
-    var builder = CallBuilder.init(allocator, &contract, func);
+    var builder = try CallBuilder.init(allocator, &contract, func);
     defer builder.deinit();
 
     const to_addr = Address.fromBytes([_]u8{0x34} ** 20);
     try builder.addArg(.{ .address = to_addr });
-    try builder.addArg(.{ .uint = U256.fromInt(1000) });
+    try builder.addArg(.{ .uint = 1000 });
 
     try std.testing.expectEqual(@as(usize, 2), builder.args.items.len);
 }
@@ -237,12 +236,12 @@ test "call builder set parameters" {
     const contract = try Contract.init(allocator, addr, &[_]abi.Function{}, &[_]abi.Event{});
     defer contract.deinit();
 
-    var builder = CallBuilder.init(allocator, &contract, func);
+    var builder = try CallBuilder.init(allocator, &contract, func);
     defer builder.deinit();
 
     const from = Address.fromBytes([_]u8{0x34} ** 20);
     builder.setFrom(from);
-    builder.setValue(U256.fromInt(1000000));
+    builder.setValue(1000000);
     builder.setGasLimit(100000);
 
     try std.testing.expect(builder.from != null);
@@ -265,9 +264,10 @@ test "call result decode" {
     const allocator = std.testing.allocator;
 
     // Simulated return data (uint256 = 1000)
+    // 1000 = 0x3E8, in big-endian 32 bytes the last two bytes are 0x03 0xE8
     var return_data: [32]u8 = [_]u8{0} ** 32;
-    return_data[29] = 0x03;
-    return_data[30] = 0xE8; // 1000 in hex
+    return_data[30] = 0x03;
+    return_data[31] = 0xE8; // 1000 = 0x3E8 in hex
 
     const func = abi.Function{
         .name = "balanceOf",
@@ -291,5 +291,5 @@ test "call result decode" {
 
     try std.testing.expectEqual(@as(usize, 1), decoded.len);
     try std.testing.expect(decoded[0] == .uint);
-    try std.testing.expect(decoded[0].uint.eql(U256.fromInt(1000)));
+    try std.testing.expect(decoded[0].uint == 1000);
 }

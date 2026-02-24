@@ -230,7 +230,7 @@ defer wallet.deinit();
 // Create transaction
 var tx = zigeth.types.Transaction.newEip1559(allocator);
 tx.to = try zigeth.primitives.Address.fromHex("0x...");
-tx.value = zigeth.primitives.U256.fromInt(100_000_000_000_000_000); // 0.1 ETH
+tx.value = 100_000_000_000_000_000; // 0.1 ETH
 tx.nonce = try provider.getTransactionCount(wallet.address);
 tx.gas_limit = 21000;
 tx.max_fee_per_gas = 30_000_000_000; // 30 gwei

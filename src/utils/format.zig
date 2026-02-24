@@ -1,7 +1,6 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
 
 /// Format an address for display (shortened format)
 /// Example: 0x1234...5678
@@ -14,14 +13,14 @@ pub fn formatAddressShort(allocator: std.mem.Allocator, address: Address) ![]u8 
     }
 
     // 0x + first 4 chars + ... + last 4 chars
-    var result = std.ArrayList(u8).init(allocator);
-    defer result.deinit();
+    var result = try std.ArrayList(u8).initCapacity(allocator, 0);
+    defer result.deinit(allocator);
 
-    try result.appendSlice(hex[0..6]); // 0x1234
-    try result.appendSlice("...");
-    try result.appendSlice(hex[hex.len - 4 ..]); // 5678
+    try result.appendSlice(allocator, hex[0..6]); // 0x1234
+    try result.appendSlice(allocator, "..."); // ...
+    try result.appendSlice(allocator, hex[hex.len - 4 ..]); // 5678
 
-    return try result.toOwnedSlice();
+    return try result.toOwnedSlice(allocator);
 }
 
 /// Format a hash for display (shortened format)
@@ -34,14 +33,14 @@ pub fn formatHashShort(allocator: std.mem.Allocator, hash: Hash) ![]u8 {
         return try allocator.dupe(u8, hex);
     }
 
-    var result = std.ArrayList(u8).init(allocator);
-    defer result.deinit();
+    var result = try std.ArrayList(u8).initCapacity(allocator, 0);
+    defer result.deinit(allocator);
 
-    try result.appendSlice(hex[0..6]); // 0xabcd
-    try result.appendSlice("...");
-    try result.appendSlice(hex[hex.len - 4 ..]); // ef01
+    try result.appendSlice(allocator, hex[0..6]); // 0xabcd
+    try result.appendSlice(allocator, "..."); // ...
+    try result.appendSlice(allocator, hex[hex.len - 4 ..]); // ef01
 
-    return try result.toOwnedSlice();
+    return try result.toOwnedSlice(allocator);
 }
 
 /// Format bytes for display with optional length limit
@@ -59,56 +58,56 @@ pub fn formatBytes(allocator: std.mem.Allocator, bytes: []const u8, max_length: 
         const prefix_len = (max - 3) / 2;
         const suffix_len = max - 3 - prefix_len;
 
-        var result = std.ArrayList(u8).init(allocator);
-        defer result.deinit();
+        var result = try std.ArrayList(u8).initCapacity(allocator, prefix_len + 3 + suffix_len);
+        defer result.deinit(allocator);
 
-        try result.appendSlice(hex[0..prefix_len]);
-        try result.appendSlice("...");
-        try result.appendSlice(hex[hex.len - suffix_len ..]);
+        try result.appendSlice(allocator, hex[0..prefix_len]);
+        try result.appendSlice(allocator, "...");
+        try result.appendSlice(allocator, hex[hex.len - suffix_len ..]);
 
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(allocator);
     }
 
     return try allocator.dupe(u8, hex);
 }
 
-/// Format a U256 as a decimal string
-pub fn formatU256(allocator: std.mem.Allocator, value: U256) ![]u8 {
+/// Format a native u256 as a decimal string
+pub fn formatU256Native(allocator: std.mem.Allocator, value: u256) ![]u8 {
     // Convert to decimal string
-    var result = std.ArrayList(u8).init(allocator);
-    defer result.deinit();
+    var result = try std.ArrayList(u8).initCapacity(allocator, 0);
+    defer result.deinit(allocator);
 
     // Handle zero case
-    if (value.isZero()) {
-        try result.append('0');
-        return try result.toOwnedSlice();
+    if (value == 0) {
+        try result.append(allocator, '0');
+        return try result.toOwnedSlice(allocator);
     }
 
     // Use a simple algorithm: repeatedly divide by 10
     var temp = value;
-    var digits = std.ArrayList(u8).init(allocator);
-    defer digits.deinit();
+    var digits = try std.ArrayList(u8).initCapacity(allocator, 0);
+    defer digits.deinit(allocator);
 
-    while (!temp.isZero()) {
-        const div_result = temp.divScalar(10);
-        const digit = @as(u8, @intCast(div_result.remainder));
-        try digits.append('0' + digit);
-        temp = div_result.quotient;
+    while (temp > 0) {
+        const digit = @as(u8, @intCast(temp % 10));
+        try digits.append(allocator, '0' + digit);
+        temp = temp / 10;
     }
 
     // Reverse digits
     var i: usize = digits.items.len;
     while (i > 0) {
         i -= 1;
-        try result.append(digits.items[i]);
+        try result.append(allocator, digits.items[i]);
     }
 
-    return try result.toOwnedSlice();
+    return try result.toOwnedSlice(allocator);
 }
 
-/// Format a U256 as a hex string with 0x prefix
-pub fn formatU256Hex(allocator: std.mem.Allocator, value: U256) ![]u8 {
-    return try value.toHex(allocator);
+/// Format a native u256 as a hex string with 0x prefix
+pub fn formatU256Hex(allocator: std.mem.Allocator, value: u256) ![]u8 {
+    const u256ToHex = @import("../primitives/uint.zig").u256ToHex;
+    return try u256ToHex(allocator, value);
 }
 
 /// Format a number with thousand separators
@@ -117,8 +116,8 @@ pub fn formatWithSeparators(allocator: std.mem.Allocator, number_str: []const u8
         return try allocator.dupe(u8, number_str);
     }
 
-    var result = std.ArrayList(u8).init(allocator);
-    defer result.deinit();
+    var result = try std.ArrayList(u8).initCapacity(allocator, 0);
+    defer result.deinit(allocator);
 
     const len = number_str.len;
     var count: usize = 0;
@@ -127,13 +126,13 @@ pub fn formatWithSeparators(allocator: std.mem.Allocator, number_str: []const u8
     while (i > 0) {
         i -= 1;
         if (count > 0 and count % 3 == 0) {
-            try result.insert(0, separator);
+            try result.insert(allocator, 0, separator);
         }
-        try result.insert(0, number_str[i]);
+        try result.insert(allocator, 0, number_str[i]);
         count += 1;
     }
 
-    return try result.toOwnedSlice();
+    return try result.toOwnedSlice(allocator);
 }
 
 /// Pad a string to a specific length with a character
@@ -177,7 +176,7 @@ pub fn truncate(allocator: std.mem.Allocator, str: []const u8, max_length: usize
 test "format address short" {
     const allocator = std.testing.allocator;
 
-    const addr = Address.fromBytes([_]u8{0x12} ++ [_]u8{0x34} ** 9 ++ [_]u8{0x56});
+    const addr = Address.fromBytes([_]u8{0x12} ** 20);
     const formatted = try formatAddressShort(allocator, addr);
     defer allocator.free(formatted);
 
@@ -206,21 +205,21 @@ test "format bytes with limit" {
     try std.testing.expect(formatted.len <= 10);
 }
 
-test "format U256 decimal" {
+test "format u256 decimal" {
     const allocator = std.testing.allocator;
 
-    const value = U256.fromInt(1234567890);
-    const formatted = try formatU256(allocator, value);
+    const value: u256 = 1234567890;
+    const formatted = try formatU256Native(allocator, value);
     defer allocator.free(formatted);
 
     try std.testing.expectEqualStrings("1234567890", formatted);
 }
 
-test "format U256 zero" {
+test "format u256 zero" {
     const allocator = std.testing.allocator;
 
-    const value = U256.zero();
-    const formatted = try formatU256(allocator, value);
+    const value: u256 = 0;
+    const formatted = try formatU256Native(allocator, value);
     defer allocator.free(formatted);
 
     try std.testing.expectEqualStrings("0", formatted);

@@ -9,21 +9,21 @@ pub const Encoder = struct {
     allocator: std.mem.Allocator,
     buffer: std.ArrayList(u8),
 
-    pub fn init(allocator: std.mem.Allocator) Encoder {
+    pub fn init(allocator: std.mem.Allocator) !Encoder {
         return .{
             .allocator = allocator,
-            .buffer = std.ArrayList(u8).init(allocator),
+            .buffer = try std.ArrayList(u8).initCapacity(allocator, 0),
         };
     }
 
     pub fn deinit(self: *Encoder) void {
-        self.buffer.deinit();
+        self.buffer.deinit(self.allocator);
     }
 
     /// Encode a uint256 value
     pub fn encodeUint256(self: *Encoder, value: u256) !void {
         const bytes = uint_utils.u256ToBytes(value);
-        try self.buffer.appendSlice(&bytes);
+        try self.buffer.appendSlice(self.allocator, &bytes);
     }
 
     /// Encode a uint value of any size (padded to 32 bytes)
@@ -36,21 +36,21 @@ pub const Encoder = struct {
     pub fn encodeInt256(self: *Encoder, value: i256) !void {
         var bytes: [32]u8 = undefined;
         std.mem.writeInt(i256, &bytes, value, .big);
-        try self.buffer.appendSlice(&bytes);
+        try self.buffer.appendSlice(self.allocator, &bytes);
     }
 
     /// Encode an address (padded to 32 bytes, left-padded with zeros)
     pub fn encodeAddress(self: *Encoder, addr: Address) !void {
         var bytes: [32]u8 = [_]u8{0} ** 32;
         @memcpy(bytes[12..32], &addr.bytes);
-        try self.buffer.appendSlice(&bytes);
+        try self.buffer.appendSlice(self.allocator, &bytes);
     }
 
     /// Encode a boolean (0 or 1, padded to 32 bytes)
     pub fn encodeBool(self: *Encoder, value: bool) !void {
         var bytes: [32]u8 = [_]u8{0} ** 32;
         bytes[31] = if (value) 1 else 0;
-        try self.buffer.appendSlice(&bytes);
+        try self.buffer.appendSlice(self.allocator, &bytes);
     }
 
     /// Encode fixed-size bytes (right-padded with zeros to 32 bytes)
@@ -59,7 +59,7 @@ pub const Encoder = struct {
 
         var bytes: [32]u8 = [_]u8{0} ** 32;
         @memcpy(bytes[0..data.len], data);
-        try self.buffer.appendSlice(&bytes);
+        try self.buffer.appendSlice(self.allocator, &bytes);
     }
 
     /// Encode dynamic bytes (length + data, padded)
@@ -68,12 +68,12 @@ pub const Encoder = struct {
         try self.encodeUint(data.len);
 
         // Encode data with padding
-        try self.buffer.appendSlice(data);
+        try self.buffer.appendSlice(self.allocator, data);
 
         // Pad to multiple of 32 bytes
         const padding = (32 - (data.len % 32)) % 32;
         if (padding > 0) {
-            try self.buffer.appendNTimes(0, padding);
+            try self.buffer.appendNTimes(self.allocator, 0, padding);
         }
     }
 
@@ -89,7 +89,7 @@ pub const Encoder = struct {
 
     /// Get owned encoded data
     pub fn toOwnedSlice(self: *Encoder) ![]u8 {
-        return try self.buffer.toOwnedSlice();
+        return try self.buffer.toOwnedSlice(self.allocator);
     }
 
     /// Reset the encoder for reuse
@@ -108,13 +108,13 @@ pub fn encodeFunctionCall(
         return error.ArgumentCountMismatch;
     }
 
-    var encoder = Encoder.init(allocator);
+    var encoder = try Encoder.init(allocator);
     defer encoder.deinit();
 
     // Add function selector (first 4 bytes)
     const selector = try function.getSelector(allocator);
     defer allocator.free(selector);
-    try encoder.buffer.appendSlice(selector);
+    try encoder.buffer.appendSlice(allocator, selector);
 
     // Encode arguments
     for (args, function.inputs) |arg, param| {
@@ -179,7 +179,7 @@ pub fn padLeft(allocator: std.mem.Allocator, data: []const u8) ![]u8 {
 test "encode uint256" {
     const allocator = std.testing.allocator;
 
-    var encoder = Encoder.init(allocator);
+    var encoder = try Encoder.init(allocator);
     defer encoder.deinit();
 
     const value: u256 = 42;
@@ -193,7 +193,7 @@ test "encode uint256" {
 test "encode address" {
     const allocator = std.testing.allocator;
 
-    var encoder = Encoder.init(allocator);
+    var encoder = try Encoder.init(allocator);
     defer encoder.deinit();
 
     const addr = Address.fromBytes([_]u8{0x12} ** 20);
@@ -212,7 +212,7 @@ test "encode address" {
 test "encode bool" {
     const allocator = std.testing.allocator;
 
-    var encoder = Encoder.init(allocator);
+    var encoder = try Encoder.init(allocator);
     defer encoder.deinit();
 
     try encoder.encodeBool(true);
@@ -230,7 +230,7 @@ test "encode bool" {
 test "encode string" {
     const allocator = std.testing.allocator;
 
-    var encoder = Encoder.init(allocator);
+    var encoder = try Encoder.init(allocator);
     defer encoder.deinit();
 
     try encoder.encodeString("hello");
@@ -247,7 +247,7 @@ test "encode string" {
 test "encode fixed bytes" {
     const allocator = std.testing.allocator;
 
-    var encoder = Encoder.init(allocator);
+    var encoder = try Encoder.init(allocator);
     defer encoder.deinit();
 
     const data = [_]u8{ 0xde, 0xad, 0xbe, 0xef };

@@ -49,7 +49,7 @@ pub const NonceMiddleware = struct {
         // Free pending transaction lists
         var pending_it = self.pending_txs.iterator();
         while (pending_it.next()) |entry| {
-            entry.value_ptr.deinit();
+            entry.value_ptr.deinit(self.allocator);
         }
         self.pending_txs.deinit();
 
@@ -122,13 +122,13 @@ pub const NonceMiddleware = struct {
 
         // Check if list exists, create if not
         if (!self.pending_txs.contains(address)) {
-            const new_list = std.ArrayList(PendingTransaction).init(self.allocator);
+            const new_list = try std.ArrayList(PendingTransaction).initCapacity(self.allocator, 0);
             try self.pending_txs.put(address, new_list);
         }
 
         // Get mutable reference to the list
         const list_ptr = self.pending_txs.getPtr(address) orelse return;
-        try list_ptr.append(pending_tx);
+        try list_ptr.append(self.allocator, pending_tx);
     }
 
     /// Get pending transaction count for an address

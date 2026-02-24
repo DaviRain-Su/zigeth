@@ -245,7 +245,7 @@ pub const SmartAccount = struct {
         const rpc = self.rpc_client orelse return false;
 
         // Get code at address using eth_getCode
-        var params_array = std.ArrayList(std.json.Value).init(self.allocator);
+        var params_array = std.json.Array.init(self.allocator);
         defer params_array.deinit();
 
         const address_hex = try self.address.toHex(self.allocator);
@@ -289,44 +289,44 @@ pub const SmartAccount = struct {
         value: u256,
         data: []const u8,
     ) ![]u8 {
-        var call_data = std.ArrayList(u8).init(self.allocator);
-        errdefer call_data.deinit();
+        var call_data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        errdefer call_data.deinit(self.allocator);
 
         // Function selector: execute(address,uint256,bytes) = 0xb61d27f6
-        try call_data.appendSlice(&[_]u8{ 0xb6, 0x1d, 0x27, 0xf6 });
+        try call_data.appendSlice(self.allocator, &[_]u8{ 0xb6, 0x1d, 0x27, 0xf6 });
 
         // Encode address (32 bytes, left-padded)
         var addr_bytes: [32]u8 = [_]u8{0} ** 32;
         @memcpy(addr_bytes[12..], &to.bytes);
-        try call_data.appendSlice(&addr_bytes);
+        try call_data.appendSlice(self.allocator, &addr_bytes);
 
         // Encode value (32 bytes)
         var value_bytes: [32]u8 = undefined;
         std.mem.writeInt(u256, &value_bytes, value, .big);
-        try call_data.appendSlice(&value_bytes);
+        try call_data.appendSlice(self.allocator, &value_bytes);
 
         // Encode data offset (32 bytes) - points to start of data
         const data_offset: u256 = 96; // After selector + address + value
         var offset_bytes: [32]u8 = undefined;
         std.mem.writeInt(u256, &offset_bytes, data_offset, .big);
-        try call_data.appendSlice(&offset_bytes);
+        try call_data.appendSlice(self.allocator, &offset_bytes);
 
         // Encode data length (32 bytes)
         const data_len: u256 = @intCast(data.len);
         var len_bytes: [32]u8 = undefined;
         std.mem.writeInt(u256, &len_bytes, data_len, .big);
-        try call_data.appendSlice(&len_bytes);
+        try call_data.appendSlice(self.allocator, &len_bytes);
 
         // Encode data (padded to 32-byte boundary)
-        try call_data.appendSlice(data);
+        try call_data.appendSlice(self.allocator, data);
 
         // Pad to 32-byte boundary
         const padding = (32 - (data.len % 32)) % 32;
         if (padding > 0) {
-            try call_data.appendNTimes(0, padding);
+            try call_data.appendNTimes(self.allocator, 0, padding);
         }
 
-        return try call_data.toOwnedSlice();
+        return try call_data.toOwnedSlice(self.allocator);
     }
 
     /// Encode batch execute call data
@@ -335,11 +335,11 @@ pub const SmartAccount = struct {
         self: *SmartAccount,
         calls: []const Call,
     ) ![]u8 {
-        var call_data = std.ArrayList(u8).init(self.allocator);
-        errdefer call_data.deinit();
+        var call_data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        errdefer call_data.deinit(self.allocator);
 
         // Function selector: executeBatch(address[],uint256[],bytes[]) = 0x47e1da2a
-        try call_data.appendSlice(&[_]u8{ 0x47, 0xe1, 0xda, 0x2a });
+        try call_data.appendSlice(self.allocator, &[_]u8{ 0x47, 0xe1, 0xda, 0x2a });
 
         // ABI encoding for three dynamic arrays
         // Layout: [selector][offset_to_dests][offset_to_values][offset_to_funcs][dests_array][values_array][funcs_array]
@@ -355,44 +355,44 @@ pub const SmartAccount = struct {
         var offset_bytes: [32]u8 = undefined;
 
         std.mem.writeInt(u256, &offset_bytes, offset_to_dests, .big);
-        try call_data.appendSlice(&offset_bytes);
+        try call_data.appendSlice(self.allocator, &offset_bytes);
 
         std.mem.writeInt(u256, &offset_bytes, offset_to_values, .big);
-        try call_data.appendSlice(&offset_bytes);
+        try call_data.appendSlice(self.allocator, &offset_bytes);
 
         std.mem.writeInt(u256, &offset_bytes, offset_to_funcs, .big);
-        try call_data.appendSlice(&offset_bytes);
+        try call_data.appendSlice(self.allocator, &offset_bytes);
 
         // Encode dests array
         const array_len: u256 = @intCast(calls.len);
         std.mem.writeInt(u256, &offset_bytes, array_len, .big);
-        try call_data.appendSlice(&offset_bytes);
+        try call_data.appendSlice(self.allocator, &offset_bytes);
 
         for (calls) |call| {
             var addr_bytes: [32]u8 = [_]u8{0} ** 32;
             @memcpy(addr_bytes[12..], &call.to.bytes);
-            try call_data.appendSlice(&addr_bytes);
+            try call_data.appendSlice(self.allocator, &addr_bytes);
         }
 
         // Encode values array
         std.mem.writeInt(u256, &offset_bytes, array_len, .big);
-        try call_data.appendSlice(&offset_bytes);
+        try call_data.appendSlice(self.allocator, &offset_bytes);
 
         for (calls) |call| {
             var value_bytes: [32]u8 = undefined;
             std.mem.writeInt(u256, &value_bytes, call.value, .big);
-            try call_data.appendSlice(&value_bytes);
+            try call_data.appendSlice(self.allocator, &value_bytes);
         }
 
         // Encode funcs array (dynamic bytes array)
         std.mem.writeInt(u256, &offset_bytes, array_len, .big);
-        try call_data.appendSlice(&offset_bytes);
+        try call_data.appendSlice(self.allocator, &offset_bytes);
 
         // Calculate offsets for each bytes element
         var current_offset: u256 = 32 * calls.len; // After all offset slots
         for (calls) |_| {
             std.mem.writeInt(u256, &offset_bytes, current_offset, .big);
-            try call_data.appendSlice(&offset_bytes);
+            try call_data.appendSlice(self.allocator, &offset_bytes);
             // Update for next element (need to calculate size)
         }
 
@@ -401,22 +401,22 @@ pub const SmartAccount = struct {
             // Length
             const data_len: u256 = @intCast(call.data.len);
             std.mem.writeInt(u256, &offset_bytes, data_len, .big);
-            try call_data.appendSlice(&offset_bytes);
+            try call_data.appendSlice(self.allocator, &offset_bytes);
 
             // Data
-            try call_data.appendSlice(call.data);
+            try call_data.appendSlice(self.allocator, call.data);
 
             // Padding to 32-byte boundary
             const padding = (32 - (call.data.len % 32)) % 32;
             if (padding > 0) {
-                try call_data.appendNTimes(0, padding);
+                try call_data.appendNTimes(self.allocator, 0, padding);
             }
 
             // Update offset for next element
             current_offset += 32 + call.data.len + padding;
         }
 
-        return try call_data.toOwnedSlice();
+        return try call_data.toOwnedSlice(self.allocator);
     }
 };
 
@@ -448,27 +448,27 @@ pub const AccountFactory = struct {
         // For SimpleAccount, the initCodeHash includes the owner
         // This is a simplified version - actual implementation depends on factory
 
-        var data = std.ArrayList(u8).init(self.allocator);
-        defer data.deinit();
+        var data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer data.deinit(self.allocator);
 
         // 0xff prefix
-        try data.append(0xff);
+        try data.append(self.allocator, 0xff);
 
         // Factory address (20 bytes)
-        try data.appendSlice(&self.address.bytes);
+        try data.appendSlice(self.allocator, &self.address.bytes);
 
         // Salt (32 bytes)
         var salt_bytes: [32]u8 = undefined;
         std.mem.writeInt(u256, &salt_bytes, salt, .big);
-        try data.appendSlice(&salt_bytes);
+        try data.appendSlice(self.allocator, &salt_bytes);
 
         // InitCode hash (simplified - includes owner)
-        var init_hash_data = std.ArrayList(u8).init(self.allocator);
-        defer init_hash_data.deinit();
-        try init_hash_data.appendSlice(&owner.bytes);
+        var init_hash_data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer init_hash_data.deinit(self.allocator);
+        try init_hash_data.appendSlice(self.allocator, &owner.bytes);
 
         const init_code_hash = keccak.hash(init_hash_data.items);
-        try data.appendSlice(&init_code_hash.bytes);
+        try data.appendSlice(self.allocator, &init_code_hash.bytes);
 
         // Calculate final address
         const address_hash = keccak.hash(data.items);
@@ -483,50 +483,50 @@ pub const AccountFactory = struct {
     /// Create init code for account deployment (v0.6 format)
     /// Format: factory_address (20 bytes) ++ createAccount(owner, salt) calldata
     pub fn createInitCode(self: *AccountFactory, owner: primitives.Address, salt: u256) ![]u8 {
-        var init_code = std.ArrayList(u8).init(self.allocator);
-        errdefer init_code.deinit();
+        var init_code = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        errdefer init_code.deinit(self.allocator);
 
         // Factory address (20 bytes)
-        try init_code.appendSlice(&self.address.bytes);
+        try init_code.appendSlice(self.allocator, &self.address.bytes);
 
         // Function selector: createAccount(address,uint256) = 0x5fbfb9cf
-        try init_code.appendSlice(&[_]u8{ 0x5f, 0xbf, 0xb9, 0xcf });
+        try init_code.appendSlice(self.allocator, &[_]u8{ 0x5f, 0xbf, 0xb9, 0xcf });
 
         // Encode owner address (32 bytes, left-padded)
         var owner_bytes: [32]u8 = [_]u8{0} ** 32;
         @memcpy(owner_bytes[12..], &owner.bytes);
-        try init_code.appendSlice(&owner_bytes);
+        try init_code.appendSlice(self.allocator, &owner_bytes);
 
         // Encode salt (32 bytes)
         var salt_bytes: [32]u8 = undefined;
         std.mem.writeInt(u256, &salt_bytes, salt, .big);
-        try init_code.appendSlice(&salt_bytes);
+        try init_code.appendSlice(self.allocator, &salt_bytes);
 
-        return try init_code.toOwnedSlice();
+        return try init_code.toOwnedSlice(self.allocator);
     }
 
     /// Create factory and factory data for v0.7+ format
     /// Returns: (factory_address, factory_data)
     pub fn createFactoryData(self: *AccountFactory, owner: primitives.Address, salt: u256) !struct { factory: primitives.Address, data: []u8 } {
-        var factory_data = std.ArrayList(u8).init(self.allocator);
-        errdefer factory_data.deinit();
+        var factory_data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        errdefer factory_data.deinit(self.allocator);
 
         // Function selector: createAccount(address,uint256) = 0x5fbfb9cf
-        try factory_data.appendSlice(&[_]u8{ 0x5f, 0xbf, 0xb9, 0xcf });
+        try factory_data.appendSlice(self.allocator, &[_]u8{ 0x5f, 0xbf, 0xb9, 0xcf });
 
         // Encode owner address (32 bytes, left-padded)
         var owner_bytes: [32]u8 = [_]u8{0} ** 32;
         @memcpy(owner_bytes[12..], &owner.bytes);
-        try factory_data.appendSlice(&owner_bytes);
+        try factory_data.appendSlice(self.allocator, &owner_bytes);
 
         // Encode salt (32 bytes)
         var salt_bytes: [32]u8 = undefined;
         std.mem.writeInt(u256, &salt_bytes, salt, .big);
-        try factory_data.appendSlice(&salt_bytes);
+        try factory_data.appendSlice(self.allocator, &salt_bytes);
 
         return .{
             .factory = self.address,
-            .data = try factory_data.toOwnedSlice(),
+            .data = try factory_data.toOwnedSlice(self.allocator),
         };
     }
 };

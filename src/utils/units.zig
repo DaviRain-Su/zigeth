@@ -1,5 +1,5 @@
 const std = @import("std");
-const U256 = @import("../primitives/uint.zig").U256; // Legacy compatibility
+const u256ToU64 = @import("../primitives/uint.zig").u256ToU64;
 
 /// Ethereum unit denominations
 pub const Unit = enum {
@@ -32,14 +32,14 @@ pub const Unit = enum {
         };
     }
 
-    /// Get the multiplier as a U256
-    pub fn multiplier(self: Unit) U256 {
+    /// Get the multiplier as a u256
+    pub fn multiplier(self: Unit) u256 {
         const exp = self.exponent();
-        var result = U256.one();
+        var result: u256 = 1;
 
         var i: u8 = 0;
         while (i < exp) : (i += 1) {
-            result = result.mulScalar(10);
+            result = result *% 10;
         }
 
         return result;
@@ -47,27 +47,26 @@ pub const Unit = enum {
 };
 
 /// Convert from wei to another unit
-pub fn fromWei(wei: U256, unit: Unit) !WeiConversion {
+pub fn fromWei(wei: u256, unit: Unit) WeiConversion {
     const mult = unit.multiplier();
-
-    // Divide wei by multiplier
-    const div_result = wei.divScalar(mult.toU64() catch return error.UnitTooLarge);
+    const quotient = wei / mult;
+    const remainder = wei % mult;
 
     return WeiConversion{
-        .integer_part = div_result.quotient,
-        .remainder_wei = U256.fromInt(div_result.remainder),
+        .integer_part = quotient,
+        .remainder_wei = remainder,
         .unit = unit,
     };
 }
 
 /// Convert to wei from another unit
-pub fn toWei(amount: u64, unit: Unit) U256 {
+pub fn toWei(amount: u64, unit: Unit) u256 {
     const mult = unit.multiplier();
-    return U256.fromInt(amount).mulScalar(mult.toU64() catch unreachable);
+    return @as(u256, amount) *% mult;
 }
 
 /// Convert to wei from a floating point amount (ether)
-pub fn etherToWei(ether: f64) !U256 {
+pub fn etherToWei(ether: f64) !u256 {
     if (ether < 0) {
         return error.NegativeValue;
     }
@@ -80,28 +79,27 @@ pub fn etherToWei(ether: f64) !U256 {
         return error.Overflow;
     }
 
-    return U256.fromInt(@as(u64, @intFromFloat(wei_value)));
+    return @as(u256, @as(u64, @intFromFloat(wei_value)));
 }
 
-/// Convert wei to ether as a floating point (native u256 version)
-pub fn weiToEther(wei: anytype) !f64 {
-    const T = @TypeOf(wei);
-    const wei_u64 = if (T == u256) blk: {
-        if (wei > std.math.maxInt(u64)) return error.ValueTooLarge;
-        break :blk @as(u64, @intCast(wei));
-    } else if (T == U256) blk: {
-        break :blk try wei.tryToU64();
-    } else {
-        @compileError("weiToEther expects u256 or U256");
-    };
-    const wei_per_ether: f64 = 1_000_000_000_000_000_000.0;
-    return @as(f64, @floatFromInt(wei_u64)) / wei_per_ether;
+/// Convert wei to ether as a floating point
+pub fn weiToEther(wei: u256) !f64 {
+    const wei_per_ether: u256 = 1_000_000_000_000_000_000;
+    const ether_part = wei / wei_per_ether;
+    const remainder = wei % wei_per_ether;
+
+    // Convert integer part to f64 (may lose precision for very large values)
+    const ether_f64: f64 = @floatFromInt(ether_part);
+    const remainder_f64: f64 = @floatFromInt(remainder);
+    const wei_per_ether_f64: f64 = 1_000_000_000_000_000_000.0;
+
+    return ether_f64 + (remainder_f64 / wei_per_ether_f64);
 }
 
 /// Result of a wei conversion
 pub const WeiConversion = struct {
-    integer_part: U256,
-    remainder_wei: U256,
+    integer_part: u256,
+    remainder_wei: u256,
     unit: Unit,
 
     /// Format as a string with decimal places
@@ -113,17 +111,17 @@ pub const WeiConversion = struct {
         const format_module = @import("./format.zig");
 
         // Get integer part
-        const integer_str = try format_module.formatU256(allocator, self.integer_part);
+        const integer_str = try format_module.formatU256Native(allocator, self.integer_part);
         defer allocator.free(integer_str);
 
-        if (decimal_places == 0 or self.remainder_wei.isZero()) {
+        if (decimal_places == 0 or self.remainder_wei == 0) {
             return try std.fmt.allocPrint(allocator, "{s}", .{integer_str});
         }
 
         // Calculate decimal part
         const mult = self.unit.multiplier();
-        const remainder_u64 = self.remainder_wei.toU64();
-        const divisor = mult.toU64() catch return error.UnitTooLarge;
+        const remainder_u64 = u256ToU64(self.remainder_wei) catch 0;
+        const divisor = u256ToU64(mult) catch return error.UnitTooLarge;
 
         // Convert remainder to decimal string
         const decimal_value = (@as(f64, @floatFromInt(remainder_u64)) / @as(f64, @floatFromInt(divisor))) *
@@ -131,11 +129,27 @@ pub const WeiConversion = struct {
 
         const decimal_int = @as(u64, @intFromFloat(decimal_value));
 
-        return try std.fmt.allocPrint(
-            allocator,
-            "{s}.{d:0>[1]}",
-            .{ integer_str, decimal_int, decimal_places },
-        );
+        // Format with appropriate decimal places using allocPrint
+        const decimal_str = try std.fmt.allocPrint(allocator, "{d}", .{decimal_int});
+        defer allocator.free(decimal_str);
+
+        // Pad with zeros if needed
+        var result = try std.ArrayList(u8).initCapacity(allocator, 0);
+        errdefer result.deinit(allocator);
+
+        try result.appendSlice(allocator, integer_str);
+        try result.append(allocator, '.');
+
+        // Add leading zeros if decimal is shorter than decimal_places
+        if (decimal_str.len < decimal_places) {
+            var zeros_needed = decimal_places - decimal_str.len;
+            while (zeros_needed > 0) : (zeros_needed -= 1) {
+                try result.append(allocator, '0');
+            }
+        }
+        try result.appendSlice(allocator, decimal_str);
+
+        return try result.toOwnedSlice(allocator);
     }
 };
 
@@ -162,14 +176,14 @@ pub fn parseUnit(str: []const u8) !Unit {
 /// Common gas price conversions
 pub const GasPrice = struct {
     /// Convert gwei to wei
-    pub fn gweiToWei(gwei: u64) U256 {
+    pub fn gweiToWei(gwei: u64) u256 {
         return toWei(gwei, .gwei);
     }
 
     /// Convert wei to gwei
-    pub fn weiToGwei(wei: U256) !u64 {
-        const conversion = try fromWei(wei, .gwei);
-        return try conversion.integer_part.tryToU64();
+    pub fn weiToGwei(wei: u256) !u64 {
+        const conversion = fromWei(wei, .gwei);
+        return u256ToU64(conversion.integer_part);
     }
 };
 
@@ -181,48 +195,48 @@ test "unit exponents" {
 
 test "to wei from ether" {
     const wei = toWei(1, .ether);
-    const expected = U256.fromInt(1_000_000_000_000_000_000);
-    try std.testing.expect(wei.eql(expected));
+    const expected: u256 = 1_000_000_000_000_000_000;
+    try std.testing.expectEqual(expected, wei);
 }
 
 test "to wei from gwei" {
     const wei = toWei(1, .gwei);
-    const expected = U256.fromInt(1_000_000_000);
-    try std.testing.expect(wei.eql(expected));
+    const expected: u256 = 1_000_000_000;
+    try std.testing.expectEqual(expected, wei);
 }
 
 test "from wei to ether" {
-    const wei = U256.fromInt(1_000_000_000_000_000_000);
-    const conversion = try fromWei(wei, .ether);
+    const wei: u256 = 1_000_000_000_000_000_000;
+    const conversion = fromWei(wei, .ether);
 
-    try std.testing.expect(conversion.integer_part.eql(U256.one()));
-    try std.testing.expect(conversion.remainder_wei.isZero());
+    try std.testing.expectEqual(@as(u256, 1), conversion.integer_part);
+    try std.testing.expectEqual(@as(u256, 0), conversion.remainder_wei);
 }
 
 test "from wei to gwei" {
-    const wei = U256.fromInt(5_000_000_000);
-    const conversion = try fromWei(wei, .gwei);
+    const wei: u256 = 5_000_000_000;
+    const conversion = fromWei(wei, .gwei);
 
-    try std.testing.expect(conversion.integer_part.eql(U256.fromInt(5)));
-    try std.testing.expect(conversion.remainder_wei.isZero());
+    try std.testing.expectEqual(@as(u256, 5), conversion.integer_part);
+    try std.testing.expectEqual(@as(u256, 0), conversion.remainder_wei);
 }
 
 test "ether to wei float" {
     const wei = try etherToWei(1.5);
-    const expected = U256.fromInt(1_500_000_000_000_000_000);
-    try std.testing.expect(wei.eql(expected));
+    const expected: u256 = 1_500_000_000_000_000_000;
+    try std.testing.expectEqual(expected, wei);
 }
 
 test "wei to ether float" {
-    const wei = U256.fromInt(1_500_000_000_000_000_000);
+    const wei: u256 = 1_500_000_000_000_000_000;
     const ether = try weiToEther(wei);
     try std.testing.expectApproxEqRel(1.5, ether, 0.0001);
 }
 
 test "gas price conversions" {
     const wei = GasPrice.gweiToWei(30);
-    const expected = U256.fromInt(30_000_000_000);
-    try std.testing.expect(wei.eql(expected));
+    const expected: u256 = 30_000_000_000;
+    try std.testing.expectEqual(expected, wei);
 
     const gwei = try GasPrice.weiToGwei(wei);
     try std.testing.expectEqual(@as(u64, 30), gwei);
@@ -239,8 +253,8 @@ test "parse unit" {
 test "conversion format" {
     const allocator = std.testing.allocator;
 
-    const wei = U256.fromInt(1_500_000_000);
-    const conversion = try fromWei(wei, .gwei);
+    const wei: u256 = 1_500_000_000;
+    const conversion = fromWei(wei, .gwei);
 
     const formatted = try conversion.format(allocator, 2);
     defer allocator.free(formatted);

@@ -380,7 +380,7 @@ pub const Keystore = struct {
         var salt: [32]u8 = undefined;
         @memcpy(&salt, salt_bytes);
 
-        const kdfparams = switch (kdf) {
+        const kdfparams: KdfParams = switch (kdf) {
             .scrypt => blk: {
                 var params = ScryptParams.default();
                 params.salt = salt;
@@ -510,11 +510,12 @@ fn decryptAES128CTR(allocator: std.mem.Allocator, ciphertext: []const u8, key: [
 /// Calculate MAC for verification
 fn calculateMAC(key: []const u8, ciphertext: []const u8) ![32]u8 {
     // MAC = keccak256(derived_key[16:32] + ciphertext)
-    var data = std.ArrayList(u8).init(std.heap.page_allocator);
-    defer data.deinit();
+    const allocator = std.heap.page_allocator;
+    var data = try std.ArrayList(u8).initCapacity(allocator, 0);
+    defer data.deinit(allocator);
 
-    try data.appendSlice(key);
-    try data.appendSlice(ciphertext);
+    try data.appendSlice(allocator, key);
+    try data.appendSlice(allocator, ciphertext);
 
     return keccak.hash(data.items).bytes;
 }
@@ -530,10 +531,10 @@ test "keystore encrypt and decrypt" {
     defer keystore.deinit();
 
     const decrypted_key = try keystore.decrypt(password);
-    const orig_u256 = try private_key.toU256();
-    const decrypted_u256 = try decrypted_key.toU256();
+    const orig_u256 = private_key.toU256();
+    const decrypted_u256 = decrypted_key.toU256();
 
-    try std.testing.expect(orig_u256.eql(decrypted_u256));
+    try std.testing.expectEqual(orig_u256, decrypted_u256);
 }
 
 test "keystore wrong password" {
@@ -618,9 +619,9 @@ test "keystore json round trip" {
     const decrypted_key = try imported.decrypt(password);
 
     // Verify keys match
-    const orig_u256 = try private_key.toU256();
-    const decrypted_u256 = try decrypted_key.toU256();
-    try std.testing.expect(orig_u256.eql(decrypted_u256));
+    const orig_u256 = private_key.toU256();
+    const decrypted_u256 = decrypted_key.toU256();
+    try std.testing.expectEqual(orig_u256, decrypted_u256);
 }
 
 test "keystore aes encryption" {

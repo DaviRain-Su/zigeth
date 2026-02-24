@@ -15,8 +15,8 @@
     // To add a new dependency, use: zig fetch --save <url>
     .dependencies = .{
         .zig_eth_secp256k1 = .{
-            .url = "https://github.com/jsign/zig-eth-secp256k1/archive/refs/heads/main.tar.gz",
-            .hash = "zig_eth_secp256k1-0.1.0-_U97sGzoDACkTnLX6ggeDfs_MhZHyxapYfhPPAtoQJJG",
+            .url = "https://github.com/DaviRain-Su/zig-eth-secp256k1/archive/refs/heads/main.tar.gz",
+            .hash = "zig_eth_secp256k1-0.1.0-_U97sLbpDAATA_3x8cFERYszQ8DPzDck3ZiffzwQOcnt",
         },
     },
     .paths = .{

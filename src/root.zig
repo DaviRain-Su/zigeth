@@ -12,15 +12,9 @@ pub const primitives = struct {
     pub const Bytes = @import("primitives/bytes.zig").Bytes;
     pub const Signature = @import("primitives/signature.zig").Signature;
 
-    /// Legacy U256 wrapper - DEPRECATED: Use native `u256` type instead
-    /// For Ethereum-specific conversions, use the utility functions:
-    /// - u256FromBytes() - Convert from big-endian bytes
-    /// - u256ToBytes() - Convert to big-endian bytes
-    /// - u256FromHex() - Parse from hex string
-    /// - u256ToHex() - Format as hex string
-    pub const U256 = @import("primitives/uint.zig").U256;
-
     // u256 Ethereum utility functions
+    // Use native `u256` type for values
+    // Use these functions for Ethereum-specific conversions:
     pub const u256FromBytes = @import("primitives/uint.zig").u256FromBytes;
     pub const u256ToBytes = @import("primitives/uint.zig").u256ToBytes;
     pub const u256FromHex = @import("primitives/uint.zig").u256FromHex;
@@ -288,4 +282,81 @@ pub const account_abstraction = struct {
 
 test {
     std.testing.refAllDecls(@This());
+
+    // Primitives
+    _ = @import("primitives/address.zig");
+    _ = @import("primitives/hash.zig");
+    _ = @import("primitives/bytes.zig");
+    _ = @import("primitives/signature.zig");
+    _ = @import("primitives/uint.zig");
+    _ = @import("primitives/bloom.zig");
+
+    // Types
+    _ = @import("types/transaction.zig");
+    _ = @import("types/block.zig");
+    _ = @import("types/receipt.zig");
+    _ = @import("types/log.zig");
+    _ = @import("types/access_list.zig");
+
+    // Crypto
+    _ = @import("crypto/keccak.zig");
+    _ = @import("crypto/secp256k1.zig");
+    _ = @import("crypto/ecdsa.zig");
+    _ = @import("crypto/utils.zig");
+
+    // ABI
+    _ = @import("abi/types.zig");
+    _ = @import("abi/encode.zig");
+    _ = @import("abi/decode.zig");
+    _ = @import("abi/packed.zig");
+
+    // RLP
+    _ = @import("rlp/encode.zig");
+    _ = @import("rlp/decode.zig");
+    _ = @import("rlp/packed.zig");
+
+    // Providers
+    _ = @import("providers/provider.zig");
+    _ = @import("providers/http.zig");
+    _ = @import("providers/ws.zig");
+    _ = @import("providers/ipc.zig");
+    _ = @import("providers/mock.zig");
+
+    // RPC
+    _ = @import("rpc/client.zig");
+    _ = @import("rpc/types.zig");
+    _ = @import("rpc/eth.zig");
+    _ = @import("rpc/net.zig");
+    _ = @import("rpc/web3.zig");
+    _ = @import("rpc/debug.zig");
+
+    // Contract
+    _ = @import("contract/contract.zig");
+    _ = @import("contract/call.zig");
+    _ = @import("contract/deploy.zig");
+    _ = @import("contract/event.zig");
+
+    // Sol
+    _ = @import("sol/types.zig");
+    _ = @import("sol/macros.zig");
+
+    // Signer
+    _ = @import("signer/signer.zig");
+    _ = @import("signer/wallet.zig");
+    _ = @import("signer/keystore.zig");
+    _ = @import("signer/ledger.zig");
+
+    // Utils
+    _ = @import("utils/hex.zig");
+    _ = @import("utils/format.zig");
+    _ = @import("utils/units.zig");
+    _ = @import("utils/checksum.zig");
+
+    // Middleware
+    _ = @import("middleware/gas.zig");
+    _ = @import("middleware/nonce.zig");
+    _ = @import("middleware/signer.zig");
+
+    // Errors
+    _ = @import("errors.zig");
 }

@@ -125,11 +125,11 @@ pub fn main() !void {
         const selectors = zigeth.sol.Selectors;
 
         std.debug.print("✅ Common ERC-20 selectors:\n", .{});
-        std.debug.print("   balanceOf:     0x{x:0>8}\n", .{selectors.ERC20_BALANCE_OF});
-        std.debug.print("   transfer:      0x{x:0>8}\n", .{selectors.ERC20_TRANSFER});
-        std.debug.print("   approve:       0x{x:0>8}\n", .{selectors.ERC20_APPROVE});
-        std.debug.print("   transferFrom:  0x{x:0>8}\n", .{selectors.ERC20_TRANSFER_FROM});
-        std.debug.print("   allowance:     0x{x:0>8}\n\n", .{selectors.ERC20_ALLOWANCE});
+        std.debug.print("   balanceOf:     {s}\n", .{selectors.ERC20_BALANCE_OF});
+        std.debug.print("   transfer:      {s}\n", .{selectors.ERC20_TRANSFER});
+        std.debug.print("   approve:       {s}\n", .{selectors.ERC20_APPROVE});
+        std.debug.print("   transferFrom:  {s}\n", .{selectors.ERC20_TRANSFER_FROM});
+        std.debug.print("   allowance:     {s}\n\n", .{selectors.ERC20_ALLOWANCE});
     }
 
     // Example 6: ABI encoding patterns

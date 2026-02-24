@@ -9,21 +9,21 @@ pub const PackedEncoder = struct {
     allocator: std.mem.Allocator,
     buffer: std.ArrayList(u8),
 
-    pub fn init(allocator: std.mem.Allocator) PackedEncoder {
+    pub fn init(allocator: std.mem.Allocator) !PackedEncoder {
         return .{
             .allocator = allocator,
-            .buffer = std.ArrayList(u8).init(allocator),
+            .buffer = try std.ArrayList(u8).initCapacity(allocator, 0),
         };
     }
 
     pub fn deinit(self: *PackedEncoder) void {
-        self.buffer.deinit();
+        self.buffer.deinit(self.allocator);
     }
 
     /// Encode a uint256 (no padding)
     pub fn encodeUint256(self: *PackedEncoder, value: u256) !void {
         const bytes = uint_utils.u256ToBytes(value);
-        try self.buffer.appendSlice(&bytes);
+        try self.buffer.appendSlice(self.allocator, &bytes);
     }
 
     /// Encode a uint of specific size
@@ -34,32 +34,32 @@ pub const PackedEncoder = struct {
 
         // Take only the required bytes from the end
         const offset = 32 - size_bytes;
-        try self.buffer.appendSlice(bytes[offset..]);
+        try self.buffer.appendSlice(self.allocator, bytes[offset..]);
     }
 
     /// Encode an address (20 bytes, no padding)
     pub fn encodeAddress(self: *PackedEncoder, addr: Address) !void {
-        try self.buffer.appendSlice(&addr.bytes);
+        try self.buffer.appendSlice(self.allocator, &addr.bytes);
     }
 
     /// Encode a boolean (1 byte: 0x00 or 0x01)
     pub fn encodeBool(self: *PackedEncoder, value: bool) !void {
-        try self.buffer.append(if (value) 1 else 0);
+        try self.buffer.append(self.allocator, if (value) 1 else 0);
     }
 
     /// Encode bytes (no length prefix, no padding)
     pub fn encodeBytes(self: *PackedEncoder, data: []const u8) !void {
-        try self.buffer.appendSlice(data);
+        try self.buffer.appendSlice(self.allocator, data);
     }
 
     /// Encode a string (UTF-8 bytes, no length prefix)
     pub fn encodeString(self: *PackedEncoder, str: []const u8) !void {
-        try self.buffer.appendSlice(str);
+        try self.buffer.appendSlice(self.allocator, str);
     }
 
     /// Encode a hash (32 bytes)
     pub fn encodeHash(self: *PackedEncoder, hash: Hash) !void {
-        try self.buffer.appendSlice(&hash.bytes);
+        try self.buffer.appendSlice(self.allocator, &hash.bytes);
     }
 
     /// Get the encoded data
@@ -69,7 +69,7 @@ pub const PackedEncoder = struct {
 
     /// Get owned encoded data
     pub fn toOwnedSlice(self: *PackedEncoder) ![]u8 {
-        return try self.buffer.toOwnedSlice();
+        return try self.buffer.toOwnedSlice(self.allocator);
     }
 
     /// Reset encoder for reuse
@@ -83,7 +83,7 @@ pub fn encodePacked(
     allocator: std.mem.Allocator,
     values: []const PackedValue,
 ) ![]u8 {
-    var encoder = PackedEncoder.init(allocator);
+    var encoder = try PackedEncoder.init(allocator);
     defer encoder.deinit();
 
     for (values) |value| {
@@ -131,7 +131,7 @@ pub fn hashPacked(
 test "packed encode uint256" {
     const allocator = std.testing.allocator;
 
-    var encoder = PackedEncoder.init(allocator);
+    var encoder = try PackedEncoder.init(allocator);
     defer encoder.deinit();
 
     const value = @as(u256, 42);
@@ -145,7 +145,7 @@ test "packed encode uint256" {
 test "packed encode address" {
     const allocator = std.testing.allocator;
 
-    var encoder = PackedEncoder.init(allocator);
+    var encoder = try PackedEncoder.init(allocator);
     defer encoder.deinit();
 
     const addr = Address.fromBytes([_]u8{0x12} ** 20);
@@ -160,7 +160,7 @@ test "packed encode address" {
 test "packed encode bool" {
     const allocator = std.testing.allocator;
 
-    var encoder = PackedEncoder.init(allocator);
+    var encoder = try PackedEncoder.init(allocator);
     defer encoder.deinit();
 
     try encoder.encodeBool(true);
@@ -174,7 +174,7 @@ test "packed encode bool" {
 test "packed encode string" {
     const allocator = std.testing.allocator;
 
-    var encoder = PackedEncoder.init(allocator);
+    var encoder = try PackedEncoder.init(allocator);
     defer encoder.deinit();
 
     try encoder.encodeString("hello");
@@ -210,14 +210,14 @@ test "packed encode vs standard" {
     const addr = Address.fromBytes([_]u8{0x12} ** 20);
 
     // Packed: exactly 20 bytes
-    var packed_enc = PackedEncoder.init(allocator);
+    var packed_enc = try PackedEncoder.init(allocator);
     defer packed_enc.deinit();
     try packed_enc.encodeAddress(addr);
     try std.testing.expectEqual(@as(usize, 20), packed_enc.toSlice().len);
 
     // Standard ABI would be 32 bytes with left padding
     const Encoder = @import("./encode.zig").Encoder;
-    var standard = Encoder.init(allocator);
+    var standard = try Encoder.init(allocator);
     defer standard.deinit();
     try standard.encodeAddress(addr);
     try std.testing.expectEqual(@as(usize, 32), standard.toSlice().len);

@@ -187,19 +187,19 @@ pub const Function = struct {
 
     /// Get function signature string
     pub fn getSignature(self: Function, allocator: std.mem.Allocator) ![]u8 {
-        var sig = std.ArrayList(u8).init(allocator);
-        defer sig.deinit();
+        var sig = try std.ArrayList(u8).initCapacity(allocator, 0);
+        defer sig.deinit(allocator);
 
-        try sig.appendSlice(self.name);
-        try sig.append('(');
+        try sig.appendSlice(allocator, self.name);
+        try sig.append(allocator, '(');
 
         for (self.inputs, 0..) |param, i| {
-            if (i > 0) try sig.append(',');
-            try sig.appendSlice(try param.type.toString(allocator));
+            if (i > 0) try sig.append(allocator, ',');
+            try sig.appendSlice(allocator, try param.type.toString(allocator));
         }
 
-        try sig.append(')');
-        return sig.toOwnedSlice();
+        try sig.append(allocator, ')');
+        return try sig.toOwnedSlice(allocator);
     }
 };
 
@@ -211,19 +211,19 @@ pub const Event = struct {
 
     /// Get event signature hash
     pub fn getSignature(self: Event, allocator: std.mem.Allocator) ![]u8 {
-        var sig = std.ArrayList(u8).init(allocator);
-        defer sig.deinit();
+        var sig = try std.ArrayList(u8).initCapacity(allocator, self.name.len + 2);
+        defer sig.deinit(allocator);
 
-        try sig.appendSlice(self.name);
-        try sig.append('(');
+        try sig.appendSlice(allocator, self.name);
+        try sig.append(allocator, '(');
 
         for (self.inputs, 0..) |param, i| {
-            if (i > 0) try sig.append(',');
-            try sig.appendSlice(try param.type.toString(allocator));
+            if (i > 0) try sig.append(allocator, ',');
+            try sig.appendSlice(allocator, try param.type.toString(allocator));
         }
 
-        try sig.append(')');
-        return sig.toOwnedSlice();
+        try sig.append(allocator, ')');
+        return try sig.toOwnedSlice(allocator);
     }
 };
 
@@ -263,16 +263,25 @@ pub fn toString(self: AbiType, allocator: std.mem.Allocator) ![]const u8 {
 }
 
 test "abi type is dynamic" {
-    try std.testing.expect(!AbiType.uint256.isDynamic());
-    try std.testing.expect(!AbiType.address.isDynamic());
-    try std.testing.expect(AbiType.string.isDynamic());
-    try std.testing.expect(AbiType.bytes.isDynamic());
+    const uint256_type: AbiType = .uint256;
+    const address_type: AbiType = .address;
+    const string_type: AbiType = .string;
+    const bytes_type: AbiType = .bytes;
+
+    try std.testing.expect(!uint256_type.isDynamic());
+    try std.testing.expect(!address_type.isDynamic());
+    try std.testing.expect(string_type.isDynamic());
+    try std.testing.expect(bytes_type.isDynamic());
 }
 
 test "abi type static size" {
-    try std.testing.expectEqual(@as(?usize, 32), AbiType.uint256.staticSize());
-    try std.testing.expectEqual(@as(?usize, 32), AbiType.address.staticSize());
-    try std.testing.expectEqual(@as(?usize, null), AbiType.string.staticSize());
+    const uint256_type: AbiType = .uint256;
+    const address_type: AbiType = .address;
+    const string_type: AbiType = .string;
+
+    try std.testing.expectEqual(@as(?usize, 32), uint256_type.staticSize());
+    try std.testing.expectEqual(@as(?usize, 32), address_type.staticSize());
+    try std.testing.expectEqual(@as(?usize, null), string_type.staticSize());
 }
 
 test "function signature" {

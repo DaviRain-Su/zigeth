@@ -149,7 +149,7 @@ test "signer creation" {
     const signer = Signer.init(pk);
 
     // Verify signer was created
-    try std.testing.expect(!signer.private_key.toU256().isZero());
+    try std.testing.expect(signer.private_key.toU256() != 0);
 }
 
 test "transaction signer with chain id" {
@@ -165,10 +165,13 @@ test "transaction signer with chain id" {
 test "personal message format" {
     // Test message formatting
     const message = "Hello Ethereum!";
+    // Prefix: \x19 (1) + "Ethereum Signed Message:\n" (26) + "15" (2) = 29 bytes
+    // Wait, let's count exactly: \x19 + "Ethereum Signed Message:" (25) + "\n" (1) + "15" (2) = 28 bytes
     const expected_prefix = "\x19Ethereum Signed Message:\n15";
 
     const prefix_len = expected_prefix.len;
     const total_len = prefix_len + message.len;
 
-    try std.testing.expectEqual(@as(usize, 30), total_len);
+    // prefix_len = 28, message.len = 15, total = 43
+    try std.testing.expectEqual(@as(usize, 43), total_len);
 }

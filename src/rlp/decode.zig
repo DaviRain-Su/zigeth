@@ -1,5 +1,14 @@
 const std = @import("std");
 
+/// RLP decoding errors
+pub const DecodeError = error{
+    UnexpectedEndOfInput,
+    InvalidLengthEncoding,
+    InvalidListLength,
+    InvalidLength,
+    OutOfMemory,
+};
+
 /// Decoded RLP value
 pub const RlpValue = union(enum) {
     bytes: []const u8,
@@ -59,7 +68,7 @@ pub const Decoder = struct {
     }
 
     /// Decode next RLP value
-    pub fn decode(self: *Decoder) !RlpValue {
+    pub fn decode(self: *Decoder) DecodeError!RlpValue {
         if (self.pos >= self.data.len) {
             return error.UnexpectedEndOfInput;
         }
@@ -123,25 +132,25 @@ pub const Decoder = struct {
     }
 
     /// Decode list payload
-    fn decodeListPayload(self: *Decoder, end: usize) !RlpValue {
-        var items = std.ArrayList(RlpValue).init(self.allocator);
+    fn decodeListPayload(self: *Decoder, end: usize) DecodeError!RlpValue {
+        var items = try std.ArrayList(RlpValue).initCapacity(self.allocator, 0);
         errdefer {
             for (items.items) |item| {
                 item.deinit(self.allocator);
             }
-            items.deinit();
+            items.deinit(self.allocator);
         }
 
         while (self.pos < end) {
             const item = try self.decode();
-            try items.append(item);
+            try items.append(self.allocator, item);
         }
 
         if (self.pos != end) {
             return error.InvalidListLength;
         }
 
-        return RlpValue{ .list = try items.toOwnedSlice() };
+        return RlpValue{ .list = try items.toOwnedSlice(self.allocator) };
     }
 
     /// Check if there's more data
@@ -288,8 +297,8 @@ test "decode list of strings" {
 test "decode nested list" {
     const allocator = std.testing.allocator;
 
-    // [["a"], "b"]
-    const data = [_]u8{ 0xc4, 0xc1, 0x61, 0x62 };
+    // [["a"], "b"] - payload is 3 bytes: C1 61 (inner list) + 62 ("b")
+    const data = [_]u8{ 0xc3, 0xc1, 0x61, 0x62 };
     const value = try decode(allocator, &data);
     defer value.deinit(allocator);
 

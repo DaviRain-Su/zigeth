@@ -155,7 +155,7 @@ pub const SignerMiddleware = struct {
         var stub = try self.allocator.alloc(u8, 65);
         @memcpy(stub[0..32], &sig.r);
         @memcpy(stub[32..64], &sig.s);
-        stub[64] = sig.v;
+        stub[64] = @intCast(sig.v);
 
         return stub;
     }
@@ -211,7 +211,7 @@ test "signer config custom" {
 test "signer middleware creation" {
     const allocator = std.testing.allocator;
 
-    const private_key = PrivateKey.fromBytes([_]u8{1} ** 32);
+    const private_key = try PrivateKey.fromBytes([_]u8{1} ** 32);
     const config = SignerConfig.mainnet();
 
     var middleware = try SignerMiddleware.init(allocator, private_key, config);
@@ -223,7 +223,7 @@ test "signer middleware creation" {
 test "signer middleware get address" {
     const allocator = std.testing.allocator;
 
-    const private_key = PrivateKey.fromBytes([_]u8{1} ** 32);
+    const private_key = try PrivateKey.fromBytes([_]u8{1} ** 32);
     const config = SignerConfig.mainnet();
 
     var middleware = try SignerMiddleware.init(allocator, private_key, config);
@@ -235,7 +235,7 @@ test "signer middleware get address" {
 test "signer middleware sign message" {
     const allocator = std.testing.allocator;
 
-    const private_key = PrivateKey.fromBytes([_]u8{1} ** 32);
+    const private_key = try PrivateKey.fromBytes([_]u8{1} ** 32);
     const config = SignerConfig.mainnet();
 
     var middleware = try SignerMiddleware.init(allocator, private_key, config);

@@ -14,15 +14,15 @@ pub const Encoder = struct {
     buffer: std.ArrayList(u8),
     allocator: std.mem.Allocator,
 
-    pub fn init(allocator: std.mem.Allocator) Encoder {
+    pub fn init(allocator: std.mem.Allocator) !Encoder {
         return .{
-            .buffer = std.ArrayList(u8).init(allocator),
+            .buffer = try std.ArrayList(u8).initCapacity(allocator, 0),
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *Encoder) void {
-        self.buffer.deinit();
+        self.buffer.deinit(self.allocator);
     }
 
     /// Get the encoded bytes
@@ -32,7 +32,7 @@ pub const Encoder = struct {
 
     /// Get owned slice and reset encoder
     pub fn toOwnedSlice(self: *Encoder) ![]u8 {
-        return try self.buffer.toOwnedSlice();
+        return try self.buffer.toOwnedSlice(self.allocator);
     }
 
     /// Encode an RLP item
@@ -64,29 +64,29 @@ pub const Encoder = struct {
     pub fn encodeBytes(self: *Encoder, data: []const u8) !void {
         if (data.len == 0) {
             // Empty string
-            try self.buffer.append(0x80);
+            try self.buffer.append(self.allocator, 0x80);
         } else if (data.len == 1 and data[0] < 0x80) {
             // Single byte < 0x80
-            try self.buffer.append(data[0]);
+            try self.buffer.append(self.allocator, data[0]);
         } else if (data.len <= 55) {
             // Short string (0-55 bytes)
-            try self.buffer.append(0x80 + @as(u8, @intCast(data.len)));
-            try self.buffer.appendSlice(data);
+            try self.buffer.append(self.allocator, 0x80 + @as(u8, @intCast(data.len)));
+            try self.buffer.appendSlice(self.allocator, data);
         } else {
             // Long string (> 55 bytes)
             const len_bytes = try encodeLengthBytes(self.allocator, data.len);
             defer self.allocator.free(len_bytes);
 
-            try self.buffer.append(0xb7 + @as(u8, @intCast(len_bytes.len)));
-            try self.buffer.appendSlice(len_bytes);
-            try self.buffer.appendSlice(data);
+            try self.buffer.append(self.allocator, 0xb7 + @as(u8, @intCast(len_bytes.len)));
+            try self.buffer.appendSlice(self.allocator, len_bytes);
+            try self.buffer.appendSlice(self.allocator, data);
         }
     }
 
     /// Encode a list of items
     pub fn encodeList(self: *Encoder, items: []const RlpItem) !void {
         // Encode all items to a temporary buffer
-        var temp_encoder = Encoder.init(self.allocator);
+        var temp_encoder = try Encoder.init(self.allocator);
         defer temp_encoder.deinit();
 
         for (items) |item| {
@@ -97,16 +97,16 @@ pub const Encoder = struct {
 
         if (payload.len <= 55) {
             // Short list
-            try self.buffer.append(0xc0 + @as(u8, @intCast(payload.len)));
-            try self.buffer.appendSlice(payload);
+            try self.buffer.append(self.allocator, 0xc0 + @as(u8, @intCast(payload.len)));
+            try self.buffer.appendSlice(self.allocator, payload);
         } else {
             // Long list
             const len_bytes = try encodeLengthBytes(self.allocator, payload.len);
             defer self.allocator.free(len_bytes);
 
-            try self.buffer.append(0xf7 + @as(u8, @intCast(len_bytes.len)));
-            try self.buffer.appendSlice(len_bytes);
-            try self.buffer.appendSlice(payload);
+            try self.buffer.append(self.allocator, 0xf7 + @as(u8, @intCast(len_bytes.len)));
+            try self.buffer.appendSlice(self.allocator, len_bytes);
+            try self.buffer.appendSlice(self.allocator, payload);
         }
     }
 };
@@ -140,7 +140,7 @@ fn encodeLengthBytes(allocator: std.mem.Allocator, length: usize) ![]u8 {
 
 /// Encode a single item and return owned slice
 pub fn encodeItem(allocator: std.mem.Allocator, item: RlpItem) ![]u8 {
-    var encoder = Encoder.init(allocator);
+    var encoder = try Encoder.init(allocator);
     defer encoder.deinit();
 
     try encoder.encode(item);
@@ -149,7 +149,7 @@ pub fn encodeItem(allocator: std.mem.Allocator, item: RlpItem) ![]u8 {
 
 /// Encode a list of items and return owned slice
 pub fn encodeList(allocator: std.mem.Allocator, items: []const RlpItem) ![]u8 {
-    var encoder = Encoder.init(allocator);
+    var encoder = try Encoder.init(allocator);
     defer encoder.deinit();
 
     try encoder.encodeList(items);
@@ -158,7 +158,7 @@ pub fn encodeList(allocator: std.mem.Allocator, items: []const RlpItem) ![]u8 {
 
 /// Encode bytes and return owned slice
 pub fn encodeBytes(allocator: std.mem.Allocator, data: []const u8) ![]u8 {
-    var encoder = Encoder.init(allocator);
+    var encoder = try Encoder.init(allocator);
     defer encoder.deinit();
 
     try encoder.encodeBytes(data);
@@ -254,9 +254,10 @@ test "encode nested list" {
     const encoded = try encodeList(allocator, &items);
     defer allocator.free(encoded);
 
-    // Inner list ["a"] = 0xc1 0x61
-    // Outer list [["a"], "b"] = 0xc4 0xc1 0x61 0x62
-    const expected = [_]u8{ 0xc4, 0xc1, 0x61, 0x62 };
+    // Inner list ["a"] = 0xc1 0x61 (2 bytes)
+    // Outer list [["a"], "b"] = 0xc3 0xc1 0x61 0x62
+    // Payload: C1 61 (inner list) + 62 ("b") = 3 bytes, so 0xc0 + 3 = 0xc3
+    const expected = [_]u8{ 0xc3, 0xc1, 0x61, 0x62 };
     try std.testing.expectEqualSlices(u8, &expected, encoded);
 }
 
@@ -305,7 +306,7 @@ test "encode uint large" {
 test "encode item union" {
     const allocator = std.testing.allocator;
 
-    var encoder = Encoder.init(allocator);
+    var encoder = try Encoder.init(allocator);
     defer encoder.deinit();
 
     try encoder.encode(.{ .bytes = "hello" });

@@ -1,7 +1,7 @@
 const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
-const U256 = @import("../primitives/uint.zig").U256;
+const u256FromBytes = @import("../primitives/uint.zig").u256FromBytes;
 const Bytes = @import("../primitives/bytes.zig").Bytes;
 const Log = @import("../types/log.zig").Log;
 const abi = @import("../abi/types.zig");
@@ -119,8 +119,8 @@ pub fn parseEvent(
     }
 
     // Extract indexed arguments from topics
-    var indexed_args = std.ArrayList(abi.AbiValue).init(allocator);
-    defer indexed_args.deinit();
+    var indexed_args = try std.ArrayList(abi.AbiValue).initCapacity(allocator, 0);
+    defer indexed_args.deinit(allocator);
 
     var topic_idx: usize = if (event.anonymous) 0 else 1; // Skip event signature if not anonymous
 
@@ -141,7 +141,7 @@ pub fn parseEvent(
                     break :blk abi.AbiValue{ .address = Address.fromBytes(addr_bytes) };
                 },
                 .uint256, .uint128, .uint64, .uint32, .uint16, .uint8 => blk: {
-                    break :blk abi.AbiValue{ .uint = U256.fromBytes(topic.bytes) };
+                    break :blk abi.AbiValue{ .uint = u256FromBytes(topic.bytes) };
                 },
                 .bool_type => blk: {
                     break :blk abi.AbiValue{ .bool_val = topic.bytes[31] != 0 };
@@ -153,14 +153,14 @@ pub fn parseEvent(
                 else => return error.UnsupportedIndexedType,
             };
 
-            try indexed_args.append(value);
+            try indexed_args.append(allocator, value);
             topic_idx += 1;
         }
     }
 
     // Decode non-indexed arguments from data
-    var data_args = std.ArrayList(abi.AbiValue).init(allocator);
-    defer data_args.deinit();
+    var data_args = try std.ArrayList(abi.AbiValue).initCapacity(allocator, 0);
+    defer data_args.deinit(allocator);
 
     if (log.data.len() > 0) {
         var decoder = decode.Decoder.init(allocator, log.data.data);
@@ -191,15 +191,15 @@ pub fn parseEvent(
                     else => return error.UnsupportedDataType,
                 };
 
-                try data_args.append(value);
+                try data_args.append(allocator, value);
             }
         }
     }
 
     return ParsedEvent{
         .event = event,
-        .indexed_args = try indexed_args.toOwnedSlice(),
-        .data_args = try data_args.toOwnedSlice(),
+        .indexed_args = try indexed_args.toOwnedSlice(allocator),
+        .data_args = try data_args.toOwnedSlice(allocator),
         .log = log,
         .allocator = allocator,
     };
@@ -211,15 +211,15 @@ pub fn parseEvents(
     event: abi.Event,
     logs: []const Log,
 ) ![]ParsedEvent {
-    var results = std.ArrayList(ParsedEvent).init(allocator);
-    defer results.deinit();
+    var results = try std.ArrayList(ParsedEvent).initCapacity(allocator, 0);
+    defer results.deinit(allocator);
 
     for (logs) |log| {
         const parsed = parseEvent(allocator, event, log) catch continue;
-        try results.append(parsed);
+        try results.append(allocator, parsed);
     }
 
-    return try results.toOwnedSlice();
+    return try results.toOwnedSlice(allocator);
 }
 
 /// Get event signature hash from event definition
@@ -239,7 +239,7 @@ test "deploy builder creation" {
         .{ .name = "initialSupply", .type = .uint256 },
     };
 
-    var builder = DeployBuilder.init(allocator, bytecode, &constructor_params);
+    var builder = try DeployBuilder.init(allocator, bytecode, &constructor_params);
     defer builder.deinit();
 
     try std.testing.expectEqual(@as(usize, 2), builder.bytecode.len());
@@ -250,10 +250,10 @@ test "deploy builder with arguments" {
 
     const bytecode = try Bytes.fromSlice(allocator, &[_]u8{ 0x60, 0x80 });
 
-    var builder = DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
+    var builder = try DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
     defer builder.deinit();
 
-    try builder.addArg(.{ .uint = U256.fromInt(1000000) });
+    try builder.addArg(.{ .uint = 1000000 });
     try builder.addArg(.{ .address = Address.fromBytes([_]u8{0x12} ** 20) });
 
     try std.testing.expectEqual(@as(usize, 2), builder.constructor_args.items.len);
@@ -302,7 +302,7 @@ test "create2 address estimation" {
 
     const bytecode = try Bytes.fromSlice(allocator, &[_]u8{ 0x60, 0x80 });
 
-    var builder = DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
+    var builder = try DeployBuilder.init(allocator, bytecode, &[_]abi.Parameter{});
     defer builder.deinit();
 
     const from = Address.fromBytes([_]u8{0x12} ** 20);

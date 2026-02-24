@@ -6,6 +6,7 @@ const rpc_client = @import("../rpc/client.zig");
 const abi = @import("../abi/types.zig");
 const encode = @import("../abi/encode.zig");
 const decode = @import("../abi/decode.zig");
+const hex = @import("../utils/hex.zig");
 
 /// ERC-4337 EntryPoint contract
 /// Supports v0.6, v0.7, and v0.8
@@ -60,11 +61,11 @@ pub const EntryPoint = struct {
         defer self.allocator.free(to_hex);
 
         // Convert call data to hex string
-        const data_hex = try std.fmt.allocPrint(self.allocator, "0x{s}", .{std.fmt.fmtSliceHexLower(call_data)});
+        const data_hex = try hex.bytesToHex(self.allocator, call_data);
         defer self.allocator.free(data_hex);
 
         // Build eth_call params
-        var params_array = std.ArrayList(std.json.Value).init(self.allocator);
+        var params_array = std.json.Array.init(self.allocator);
         defer params_array.deinit();
 
         // Call object
@@ -97,7 +98,7 @@ pub const EntryPoint = struct {
         defer self.allocator.free(from_hex);
 
         // Convert call data to hex string
-        const data_hex = try std.fmt.allocPrint(self.allocator, "0x{s}", .{std.fmt.fmtSliceHexLower(call_data)});
+        const data_hex = try hex.bytesToHex(self.allocator, call_data);
         defer self.allocator.free(data_hex);
 
         // Convert value to hex
@@ -105,7 +106,7 @@ pub const EntryPoint = struct {
         defer self.allocator.free(value_hex);
 
         // Build eth_sendTransaction params
-        var params_array = std.ArrayList(std.json.Value).init(self.allocator);
+        var params_array = std.json.Array.init(self.allocator);
         defer params_array.deinit();
 
         // Transaction object
@@ -129,22 +130,22 @@ pub const EntryPoint = struct {
     /// Call: getNonce(address sender, uint192 key)
     pub fn getNonce(self: *EntryPoint, sender: primitives.Address, key: u192) !u256 {
         // Build call data
-        var call_data = std.ArrayList(u8).init(self.allocator);
-        defer call_data.deinit();
+        var call_data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer call_data.deinit(self.allocator);
 
         // Function selector: getNonce(address,uint192) = 0x35567e1a
-        try call_data.appendSlice(&[_]u8{ 0x35, 0x56, 0x7e, 0x1a });
+        try call_data.appendSlice(self.allocator, &[_]u8{ 0x35, 0x56, 0x7e, 0x1a });
 
         // Encode address (32 bytes, left-padded)
         var addr_bytes: [32]u8 = [_]u8{0} ** 32;
         @memcpy(addr_bytes[12..], &sender.bytes);
-        try call_data.appendSlice(&addr_bytes);
+        try call_data.appendSlice(self.allocator, &addr_bytes);
 
         // Encode uint192 key (32 bytes)
         var key_bytes: [32]u8 = [_]u8{0} ** 32;
         const key_u256: u256 = @intCast(key);
         std.mem.writeInt(u256, &key_bytes, key_u256, .big);
-        try call_data.appendSlice(&key_bytes);
+        try call_data.appendSlice(self.allocator, &key_bytes);
 
         // Make eth_call
         const result_hex = try self.ethCall(call_data.items);
@@ -163,16 +164,16 @@ pub const EntryPoint = struct {
     /// Call: balanceOf(address account)
     pub fn balanceOf(self: *EntryPoint, account: primitives.Address) !u256 {
         // Build call data
-        var call_data = std.ArrayList(u8).init(self.allocator);
-        defer call_data.deinit();
+        var call_data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer call_data.deinit(self.allocator);
 
         // Function selector: balanceOf(address) = 0x70a08231
-        try call_data.appendSlice(&[_]u8{ 0x70, 0xa0, 0x82, 0x31 });
+        try call_data.appendSlice(self.allocator, &[_]u8{ 0x70, 0xa0, 0x82, 0x31 });
 
         // Encode address (32 bytes, left-padded)
         var addr_bytes: [32]u8 = [_]u8{0} ** 32;
         @memcpy(addr_bytes[12..], &account.bytes);
-        try call_data.appendSlice(&addr_bytes);
+        try call_data.appendSlice(self.allocator, &addr_bytes);
 
         // Make eth_call
         const result_hex = try self.ethCall(call_data.items);
@@ -192,16 +193,16 @@ pub const EntryPoint = struct {
     /// Returns: (uint112 deposit, bool staked, uint112 stake, uint32 unstakeDelaySec, uint48 withdrawTime)
     pub fn getDepositInfo(self: *EntryPoint, account: primitives.Address) !DepositInfo {
         // Build call data
-        var call_data = std.ArrayList(u8).init(self.allocator);
-        defer call_data.deinit();
+        var call_data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer call_data.deinit(self.allocator);
 
         // Function selector: getDepositInfo(address) = 0x5287ce12
-        try call_data.appendSlice(&[_]u8{ 0x52, 0x87, 0xce, 0x12 });
+        try call_data.appendSlice(self.allocator, &[_]u8{ 0x52, 0x87, 0xce, 0x12 });
 
         // Encode address (32 bytes, left-padded)
         var addr_bytes: [32]u8 = [_]u8{0} ** 32;
         @memcpy(addr_bytes[12..], &account.bytes);
-        try call_data.appendSlice(&addr_bytes);
+        try call_data.appendSlice(self.allocator, &addr_bytes);
 
         // Make eth_call
         const result_hex = try self.ethCall(call_data.items);
@@ -233,12 +234,12 @@ pub const EntryPoint = struct {
     /// Call: simulateValidation(UserOperation calldata userOp)
     pub fn simulateValidation(self: *EntryPoint, user_op: types.UserOperation) !ValidationResult {
         // Build call data
-        var call_data = std.ArrayList(u8).init(self.allocator);
-        defer call_data.deinit();
+        var call_data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer call_data.deinit(self.allocator);
 
         // Function selector: simulateValidation((address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes))
         // v0.6 selector = 0xee219423
-        try call_data.appendSlice(&[_]u8{ 0xee, 0x21, 0x94, 0x23 });
+        try call_data.appendSlice(self.allocator, &[_]u8{ 0xee, 0x21, 0x94, 0x23 });
 
         // TODO: Full UserOperation encoding (complex tuple encoding)
         // For now, this is a placeholder showing the structure
@@ -264,12 +265,12 @@ pub const EntryPoint = struct {
         from: primitives.Address,
     ) !Hash {
         // Build call data
-        var call_data = std.ArrayList(u8).init(self.allocator);
-        defer call_data.deinit();
+        var call_data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer call_data.deinit(self.allocator);
 
         // Function selector: handleOps((address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes)[],address)
         // v0.6 selector = 0x1fad948c
-        try call_data.appendSlice(&[_]u8{ 0x1f, 0xad, 0x94, 0x8c });
+        try call_data.appendSlice(self.allocator, &[_]u8{ 0x1f, 0xad, 0x94, 0x8c });
 
         // TODO: Full UserOperation array encoding (very complex)
         // Would need to:
@@ -293,16 +294,16 @@ pub const EntryPoint = struct {
     /// Call: depositTo(address account) payable
     pub fn depositTo(self: *EntryPoint, account: primitives.Address, amount: u256, from: primitives.Address) !Hash {
         // Build call data
-        var call_data = std.ArrayList(u8).init(self.allocator);
-        defer call_data.deinit();
+        var call_data = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer call_data.deinit(self.allocator);
 
         // Function selector: depositTo(address) = 0xb760faf9
-        try call_data.appendSlice(&[_]u8{ 0xb7, 0x60, 0xfa, 0xf9 });
+        try call_data.appendSlice(self.allocator, &[_]u8{ 0xb7, 0x60, 0xfa, 0xf9 });
 
         // Encode address (32 bytes, left-padded)
         var addr_bytes: [32]u8 = [_]u8{0} ** 32;
         @memcpy(addr_bytes[12..], &account.bytes);
-        try call_data.appendSlice(&addr_bytes);
+        try call_data.appendSlice(self.allocator, &addr_bytes);
 
         // Send transaction with value
         return try self.sendTransaction(call_data.items, from, amount);

@@ -2,7 +2,7 @@ const std = @import("std");
 const Address = @import("../primitives/address.zig").Address;
 const Hash = @import("../primitives/hash.zig").Hash;
 const Signature = @import("../primitives/signature.zig").Signature;
-const U256 = @import("../primitives/uint.zig").U256;
+const u256ToU64 = @import("../primitives/uint.zig").u256ToU64;
 const Transaction = @import("../types/transaction.zig").Transaction;
 const PrivateKey = @import("../crypto/secp256k1.zig").PrivateKey;
 const PublicKey = @import("../crypto/secp256k1.zig").PublicKey;
@@ -117,12 +117,12 @@ pub const Wallet = struct {
         var encoder = RlpEncoder.init(self.allocator);
         defer encoder.deinit();
 
-        switch (tx.transaction_type) {
+        switch (tx.type) {
             .legacy => {
                 // Legacy transaction with EIP-155
                 try encoder.startList();
                 try encoder.appendItem(.{ .uint = tx.nonce });
-                try encoder.appendItem(.{ .uint = tx.gas_price.toU64() catch 0 });
+                try encoder.appendItem(.{ .uint = u256ToU64(tx.gas_price orelse 0) catch 0 });
                 try encoder.appendItem(.{ .uint = tx.gas_limit });
 
                 if (tx.to) |to_addr| {
@@ -131,8 +131,8 @@ pub const Wallet = struct {
                     try encoder.appendItem(.{ .bytes = &[_]u8{} });
                 }
 
-                try encoder.appendItem(.{ .uint = tx.value.toU64() catch 0 });
-                try encoder.appendItem(.{ .bytes = tx.data });
+                try encoder.appendItem(.{ .uint = u256ToU64(tx.value) catch 0 });
+                try encoder.appendItem(.{ .bytes = tx.data.data });
 
                 // EIP-155: add chain_id, 0, 0
                 try encoder.appendItem(.{ .uint = chain_id });
@@ -150,13 +150,13 @@ pub const Wallet = struct {
                 try encoder.appendItem(.{ .uint = chain_id });
                 try encoder.appendItem(.{ .uint = tx.nonce });
 
-                switch (tx.transaction_type) {
+                switch (tx.type) {
                     .eip2930 => {
-                        try encoder.appendItem(.{ .uint = tx.gas_price.toU64() catch 0 });
+                        try encoder.appendItem(.{ .uint = u256ToU64(tx.gas_price orelse 0) catch 0 });
                     },
                     .eip1559, .eip4844, .eip7702 => {
-                        try encoder.appendItem(.{ .uint = tx.max_priority_fee_per_gas.toU64() catch 0 });
-                        try encoder.appendItem(.{ .uint = tx.max_fee_per_gas.toU64() catch 0 });
+                        try encoder.appendItem(.{ .uint = u256ToU64(tx.max_priority_fee_per_gas orelse 0) catch 0 });
+                        try encoder.appendItem(.{ .uint = u256ToU64(tx.max_fee_per_gas orelse 0) catch 0 });
                     },
                     else => unreachable,
                 }
@@ -169,20 +169,31 @@ pub const Wallet = struct {
                     try encoder.appendItem(.{ .bytes = &[_]u8{} });
                 }
 
-                try encoder.appendItem(.{ .uint = tx.value.toU64() catch 0 });
-                try encoder.appendItem(.{ .bytes = tx.data });
+                try encoder.appendItem(.{ .uint = u256ToU64(tx.value) catch 0 });
+                try encoder.appendItem(.{ .bytes = tx.data.data });
 
                 // Access list (empty for now)
                 try encoder.appendItem(.{ .list = &[_]RlpItem{} });
 
                 // EIP-4844 specific
-                if (tx.transaction_type == .eip4844) {
-                    try encoder.appendItem(.{ .uint = tx.max_fee_per_blob_gas.toU64() catch 0 });
-                    try encoder.appendItem(.{ .list = &[_]RlpItem{} }); // blob versioned hashes
+                if (tx.type == .eip4844) {
+                    const blob_fee = u256ToU64(tx.max_fee_per_blob_gas orelse 0) catch 0;
+                    try encoder.appendItem(.{ .uint = blob_fee });
+                    // Encode blob versioned hashes as list of bytes32
+                    if (tx.blob_versioned_hashes) |hashes| {
+                        var hash_items = try self.allocator.alloc(RlpItem, hashes.len);
+                        defer self.allocator.free(hash_items);
+                        for (hashes, 0..) |h, i| {
+                            hash_items[i] = .{ .bytes = &h.bytes };
+                        }
+                        try encoder.appendItem(.{ .list = hash_items });
+                    } else {
+                        try encoder.appendItem(.{ .list = &[_]RlpItem{} });
+                    }
                 }
 
                 // EIP-7702 specific
-                if (tx.transaction_type == .eip7702) {
+                if (tx.type == .eip7702) {
                     try encoder.appendItem(.{ .list = &[_]RlpItem{} }); // authorization list
                 }
 
@@ -190,7 +201,7 @@ pub const Wallet = struct {
                 defer self.allocator.free(encoded);
 
                 // Prepend transaction type
-                const tx_type: u8 = switch (tx.transaction_type) {
+                const tx_type: u8 = switch (tx.type) {
                     .eip2930 => 0x01,
                     .eip1559 => 0x02,
                     .eip4844 => 0x03,
@@ -210,7 +221,7 @@ pub const Wallet = struct {
 
     /// Sign a message hash
     pub fn signHash(self: *Wallet, hash: [32]u8) !Signature {
-        return try self.signer.signHash(hash);
+        return try self.signer.signHash(Hash.fromBytes(hash));
     }
 
     /// Sign a message (with Ethereum prefix)
@@ -228,14 +239,14 @@ pub const Wallet = struct {
         @memcpy(data[34..66], &message_hash);
 
         const hash = keccak.hash(&data);
-        return try self.signer.signHash(hash.bytes);
+        return try self.signer.signHash(hash);
     }
 
     /// Verify a signature
     pub fn verifySignature(self: *Wallet, hash: [32]u8, signature: Signature) !bool {
         const ecdsa = @import("../crypto/ecdsa.zig");
-        const recovered_addr = try ecdsa.recoverAddress(hash, signature);
-        return recovered_addr.eql(self.address);
+        const recovered_addr = try ecdsa.recoverAddress(Hash.fromBytes(hash), signature);
+        return std.mem.eql(u8, &recovered_addr.bytes, &self.address.bytes);
     }
 
     /// Get signer interface
@@ -320,19 +331,19 @@ pub const Mnemonic = struct {
     /// Create mnemonic from phrase
     pub fn fromPhrase(allocator: std.mem.Allocator, phrase: []const u8) !Mnemonic {
         // Split by spaces
-        var words = std.ArrayList([]const u8).init(allocator);
-        defer words.deinit();
+        var words = try std.ArrayList([]const u8).initCapacity(allocator, 0);
+        defer words.deinit(allocator);
 
         var iter = std.mem.splitScalar(u8, phrase, ' ');
         while (iter.next()) |word| {
             if (word.len > 0) {
                 const word_copy = try allocator.dupe(u8, word);
-                try words.append(word_copy);
+                try words.append(allocator, word_copy);
             }
         }
 
         return .{
-            .words = try words.toOwnedSlice(),
+            .words = try words.toOwnedSlice(allocator),
             .allocator = allocator,
         };
     }
@@ -344,10 +355,10 @@ pub const Mnemonic = struct {
         const phrase = try self.toPhrase();
         defer self.allocator.free(phrase);
 
-        var salt = std.ArrayList(u8).init(self.allocator);
-        defer salt.deinit();
-        try salt.appendSlice("mnemonic");
-        try salt.appendSlice(passphrase);
+        var salt = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer salt.deinit(self.allocator);
+        try salt.appendSlice(self.allocator, "mnemonic");
+        try salt.appendSlice(self.allocator, passphrase);
 
         // Derive 64-byte seed using PBKDF2-HMAC-SHA512
         var seed: [64]u8 = undefined;
@@ -364,15 +375,15 @@ pub const Mnemonic = struct {
 
     /// Get phrase as string
     pub fn toPhrase(self: Mnemonic) ![]u8 {
-        var phrase = std.ArrayList(u8).init(self.allocator);
-        defer phrase.deinit();
+        var phrase = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        defer phrase.deinit(self.allocator);
 
         for (self.words, 0..) |word, i| {
-            if (i > 0) try phrase.append(' ');
-            try phrase.appendSlice(word);
+            if (i > 0) try phrase.append(self.allocator, ' ');
+            try phrase.appendSlice(self.allocator, word);
         }
 
-        return phrase.toOwnedSlice();
+        return phrase.toOwnedSlice(self.allocator);
     }
 
     /// Free memory
