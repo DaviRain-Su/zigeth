@@ -16,7 +16,7 @@
     .dependencies = .{
         .zig_eth_secp256k1 = .{
             .url = "https://github.com/DaviRain-Su/zig-eth-secp256k1/archive/refs/heads/main.tar.gz",
-            .hash = "zig_eth_secp256k1-0.1.0-_U97sLbpDAATA_3x8cFERYszQ8DPzDck3ZiffzwQOcnt",
+            .hash = "zig_eth_secp256k1-0.1.0-_U97sBjqDACdmkjL_I_1dncMBvOZ0iSxbcMg4pIcVM4P",
         },
     },
     .paths = .{
