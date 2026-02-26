@@ -66,33 +66,37 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the zigeth CLI");
     run_step.dependOn(&run_cmd.step);
 
-    // Unit tests for library
+    // Unit tests for library (ReleaseSafe + bundle_ubsan_rt avoids LLVM "Unsupported library call" and satisfies libsecp256k1 ubsan refs)
+    const lib_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = .ReleaseSafe,
+    });
     const lib_unit_tests = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/root.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = lib_test_mod,
     });
 
     lib_unit_tests.root_module.addImport("secp256k1", secp256k1_mod);
     lib_unit_tests.linkLibC();
     lib_unit_tests.linkLibrary(secp256k1_artifact);
+    lib_unit_tests.bundle_ubsan_rt = true;
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
-    // Unit tests for executable
+    // Unit tests for executable (ReleaseSafe + bundle_ubsan_rt avoids LLVM "Unsupported library call" and satisfies libsecp256k1 ubsan refs)
+    const exe_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = .ReleaseSafe,
+    });
     const exe_unit_tests = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = exe_test_mod,
     });
 
     exe_unit_tests.root_module.addImport("zigeth", zigeth_mod);
     exe_unit_tests.linkLibC();
     exe_unit_tests.linkLibrary(secp256k1_artifact);
+    exe_unit_tests.bundle_ubsan_rt = true;
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
